@@ -1,5 +1,6 @@
 package st4s1k.jdbcplus.utils;
 
+import lombok.extern.slf4j.Slf4j;
 import st4s1k.jdbcplus.annotations.*;
 import st4s1k.jdbcplus.exceptions.InvalidMappingException;
 
@@ -9,12 +10,14 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.concatenateArrays;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.toSnakeLowerCase;
 
+@Slf4j
 public class EntityUtils {
 
   private EntityUtils() {
@@ -62,15 +65,23 @@ public class EntityUtils {
   }
 
   public static String getIdColumnName(final Class<?> clazz) {
-    final var idColumn = getIdColumn(clazz);
-    return idColumn.isAnnotationPresent(Column.class)
-        ? idColumn.getAnnotation(Column.class).value()
-        : idColumn.getName();
+    return getIdColumnName(getIdColumn(clazz));
+  }
+
+  public static String getIdColumnName(final Field field) {
+    requireNonNull(field);
+    if (field.isAnnotationPresent(Id.class)) {
+      return field.isAnnotationPresent(Column.class)
+          ? field.getAnnotation(Column.class).value()
+          : toSnakeLowerCase(field.getName());
+    }
+    return null;
   }
 
   public static Field[] getColumns(final Class<?> clazz) {
     return concatenateArrays(
         Field.class,
+        new Field[]{getIdColumn(clazz)},
         getColumnFields(clazz),
         getOneToOneFields(clazz),
         getManyToOneFields(clazz));
@@ -81,10 +92,14 @@ public class EntityUtils {
   }
 
   public static String getColumnName(final Field field) {
-    return Optional.ofNullable(field)
-        .filter(f -> f.isAnnotationPresent(Column.class))
-        .map(f -> f.getAnnotation(Column.class).value())
-        .orElse(getJoinColumnName(field));
+    if (field.isAnnotationPresent(Column.class)) {
+      return field.getAnnotation(Column.class).value();
+    } else if (field.isAnnotationPresent(JoinColumn.class)) {
+      return getJoinColumnName(field);
+    } else if (field.isAnnotationPresent(Id.class)) {
+      return getIdColumnName(field);
+    }
+    return null;
   }
 
   public static String[] getColumnNames(final Class<?> clazz) {
@@ -97,9 +112,8 @@ public class EntityUtils {
     requireNonNull(field);
     if (field.isAnnotationPresent(JoinColumn.class)) {
       return field.getAnnotation(JoinColumn.class).value();
-    } else {
-      return toSnakeLowerCase(field.getName());
     }
+    return null;
   }
 
   public static Map<String, Field> getColumnsMap(final Class<?> clazz) {
@@ -198,17 +212,23 @@ public class EntityUtils {
   public static <T> Object getColumnValue(
       final Field field,
       final T entity) {
+    final Predicate<Field> hasColumnAnnotation = f -> f.isAnnotationPresent(Column.class);
+    final Predicate<Field> hasIdAnnotation = f -> f.isAnnotationPresent(Id.class);
+    final Predicate<Field> hasJoinColumnAnnotation = f -> f.isAnnotationPresent(JoinColumn.class);
     return Optional.ofNullable(field)
-        .filter(f -> f.isAnnotationPresent(Column.class))
+        .filter(hasColumnAnnotation
+            .or(hasJoinColumnAnnotation)
+            .or(hasIdAnnotation))
         .map(column -> {
           try {
             column.setAccessible(true);
             return column.get(entity);
           } catch (IllegalAccessException e) {
-            e.printStackTrace();
+            log.error(e.getLocalizedMessage(), e);
             return null;
           }
-        }).orElse(null);
+        })
+        .orElse(null);
   }
 
   public static <T> Object[] getColumnValues(
@@ -238,7 +258,7 @@ public class EntityUtils {
       idColumn.setAccessible(true);
       return idColumn.get(entity);
     } catch (IllegalAccessException e) {
-      e.printStackTrace();
+      log.error(e.getLocalizedMessage(), e);
       return null;
     }
   }

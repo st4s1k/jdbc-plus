@@ -457,11 +457,11 @@ public interface AbstractRepository {
       final Function<ResultSet, R> resultSetFunction,
       final Supplier<R> defaultResult) throws IllegalAccessException {
 
-    final R resultList = getDatabaseConnection().queryTransaction(query,
+    final R result = getDatabaseConnection().queryTransaction(query,
         resultSetFunction, defaultResult);
 
     field.setAccessible(true);
-    field.set(entity, resultList);
+    field.set(entity, result);
   }
 
   /**
