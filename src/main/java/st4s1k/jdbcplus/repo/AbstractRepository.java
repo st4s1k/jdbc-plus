@@ -28,6 +28,58 @@ public interface AbstractRepository {
   DatabaseConnection getDatabaseConnection();
 
   /**
+   * Get {@link String} value for building SQL query.
+   *
+   * @return string value
+   */
+  default String getStringValueForSql(final Object value) {
+    if (value == null) {
+      return "NULL";
+    } else if (!value.getClass().isArray()) {
+      if (value instanceof String ||
+          value instanceof Character) {
+        return "'" + value + "'";
+      }
+      return String.valueOf(value);
+    } else {
+      if (value instanceof Object[]) {
+        var objArr = (Object[]) value;
+        if (value instanceof String[] ||
+            value instanceof Character[]) {
+          final var strArr = (Object[]) value;
+          objArr = new String[strArr.length];
+          for (int i = 0; i < strArr.length; i++) {
+            objArr[i] = "'" + strArr[i] + "'";
+          }
+        }
+        return Arrays.toString(objArr);
+      } else if (value instanceof long[]) {
+        return Arrays.toString((long[]) value);
+      } else if (value instanceof int[]) {
+        return Arrays.toString((int[]) value);
+      } else if (value instanceof short[]) {
+        return Arrays.toString((short[]) value);
+      } else if (value instanceof char[]) {
+        final var charArr = (char[]) value;
+        final var newCharArr = new String[charArr.length];
+        for (int i = 0; i < charArr.length; i++) {
+          newCharArr[i] = "'" + charArr[i] + "'";
+        }
+        return Arrays.toString(newCharArr);
+      } else if (value instanceof byte[]) {
+        return Arrays.toString((byte[]) value);
+      } else if (value instanceof boolean[]) {
+        return Arrays.toString((boolean[]) value);
+      } else if (value instanceof float[]) {
+        return Arrays.toString((float[]) value);
+      } else if (value instanceof double[]) {
+        return Arrays.toString((double[]) value);
+      }
+      return "";
+    }
+  }
+
+  /**
    * Generates REMOVE sql query for an entity.
    *
    * @param entity the entity
@@ -39,8 +91,7 @@ public interface AbstractRepository {
     final String table = getTableName(clazz);
     final String id = getIdColumnName(clazz);
     final Object idColumnValue = getIdColumnValue(entity, clazz);
-    final String value = idColumnValue instanceof String ?
-        "'" + idColumnValue + "'" : String.valueOf(idColumnValue);
+    final String value = getStringValueForSql(idColumnValue);
     return "delete from " + table + " where " + id + " = " + value + " " +
         "returning *";
   }
@@ -85,8 +136,7 @@ public interface AbstractRepository {
     final String table = getTableName(clazz);
     final var idColumnName = getIdColumnName(clazz);
     final var idValue = getIdColumnValue(entity, clazz);
-    final var idStringValue = idValue instanceof String ?
-        "'" + idValue + "'" : String.valueOf(idValue);
+    final var idStringValue = getStringValueForSql(idValue);
     final var fieldNames = getColumnNames(clazz);
     final var fieldValues = getColumnValuesAsString(entity, clazz);
     final var columns = new StringBuilder();
@@ -150,8 +200,7 @@ public interface AbstractRepository {
           conditions.append(", ");
         }
         final String column = columns[i];
-        final String value = values[i] instanceof String ? "'" + values[i] +
-            "'" : values[i].toString();
+        final String value = getStringValueForSql(values[i]);
         conditions.append(column).append(" = ").append(value);
       }
       return sqlSelectAll(table) + " where " + conditions;
