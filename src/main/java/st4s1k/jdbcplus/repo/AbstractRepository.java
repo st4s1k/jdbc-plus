@@ -522,12 +522,15 @@ public interface AbstractRepository {
       final ResultSetMetaData metaData,
       final String currentEntityIdColumnName,
       final String targetEntityIdColumnName) throws SQLException {
-    return Objects.nonNull(metaData)
-        && metaData.getColumnCount() == 2
-        && (metaData.getColumnName(1).equals(currentEntityIdColumnName)
-        || metaData.getColumnName(2).equals(currentEntityIdColumnName))
-        && (metaData.getColumnName(1).equals(targetEntityIdColumnName)
-        || metaData.getColumnName(2).equals(targetEntityIdColumnName));
+    return Objects.nonNull(metaData) && metaData.getColumnCount() == 2 && (
+        (
+            metaData.getColumnName(1).equals(currentEntityIdColumnName)
+                && metaData.getColumnName(2).equals(targetEntityIdColumnName)
+        ) || (
+            metaData.getColumnName(2).equals(currentEntityIdColumnName)
+                && metaData.getColumnName(1).equals(targetEntityIdColumnName)
+        )
+    );
   }
 
   /**

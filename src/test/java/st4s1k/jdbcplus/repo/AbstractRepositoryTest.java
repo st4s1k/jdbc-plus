@@ -2,14 +2,21 @@ package st4s1k.jdbcplus.repo;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import st4s1k.jdbcplus.utils.EntityUtils;
 
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class AbstractRepositoryTest {
 
@@ -175,12 +182,95 @@ class AbstractRepositoryTest {
     assertThat(result).isEqualTo(singletonList(entity));
   }
 
-  @Test
-  void testValidManyToManyResultSet() throws SQLException {
-    ResultSetMetaData metaData;
-    boolean result = abstractRepository.validManyToManyResultSet(metaData,
-        "currentEntityIdColumnName", "targetEntityIdColumnName");
-    assertThat(result).isEqualTo(true);
+  @ParameterizedTest
+  @MethodSource("parametersForValidManyToManyResultSet")
+  void testValidManyToManyResultSet(
+      final int columnCount,
+      final String actualCurrentEntityIdColumnName,
+      final String actualTargetEntityIdColumnName,
+      final String expectedCurrentEntityIdColumnNameBar,
+      final String expectedTargetEntityIdColumnNameBar,
+      final boolean expectedResult
+  ) throws SQLException {
+    final var metaData = mock(ResultSetMetaData.class);
+
+    when(metaData.getColumnCount()).thenReturn(columnCount);
+    when(metaData.getColumnName(1)).thenReturn(actualCurrentEntityIdColumnName);
+    when(metaData.getColumnName(2)).thenReturn(actualTargetEntityIdColumnName);
+
+    final var actualResult = abstractRepository.validManyToManyResultSet(
+        metaData,
+        expectedCurrentEntityIdColumnNameBar,
+        expectedTargetEntityIdColumnNameBar
+    );
+
+    assertThat(actualResult).isEqualTo(expectedResult);
+  }
+
+  private static Stream<Arguments> parametersForValidManyToManyResultSet() {
+    final var validNumberOfColumns = 2;
+    final var validActualCurrentEntityIdColumnName = "currentEntityIdColumnName";
+    final var validActualTargetEntityIdColumnName = "targetEntityIdColumnName";
+    final var validExpectedCurrentEntityIdColumnName = "currentEntityIdColumnName";
+    final var validExpectedTargetEntityIdColumnName = "targetEntityIdColumnName";
+    return Stream.of(
+        arguments(
+            validNumberOfColumns,
+            validActualCurrentEntityIdColumnName,
+            validActualTargetEntityIdColumnName,
+            validExpectedCurrentEntityIdColumnName,
+            validExpectedTargetEntityIdColumnName,
+            true
+        ),
+        arguments(
+            validNumberOfColumns,
+            validActualCurrentEntityIdColumnName,
+            validActualTargetEntityIdColumnName,
+            validExpectedTargetEntityIdColumnName,
+            validExpectedCurrentEntityIdColumnName,
+            true
+        ),
+        arguments(
+            1,
+            validActualCurrentEntityIdColumnName,
+            validActualTargetEntityIdColumnName,
+            validExpectedCurrentEntityIdColumnName,
+            validExpectedTargetEntityIdColumnName,
+            false
+        ),
+        arguments(
+            3,
+            validActualCurrentEntityIdColumnName,
+            validActualTargetEntityIdColumnName,
+            validExpectedCurrentEntityIdColumnName,
+            validExpectedTargetEntityIdColumnName,
+            false
+        ),
+        arguments(
+            validNumberOfColumns,
+            "invalidActualCurrentEntityIdColumnName",
+            validActualTargetEntityIdColumnName,
+            validExpectedCurrentEntityIdColumnName,
+            validExpectedTargetEntityIdColumnName,
+            false
+        ),
+        arguments(
+            validNumberOfColumns,
+            validActualCurrentEntityIdColumnName,
+            "invalidActualTargetEntityIdColumnName",
+            validExpectedCurrentEntityIdColumnName,
+            validExpectedTargetEntityIdColumnName,
+            false
+        ),
+        arguments(
+            validNumberOfColumns,
+            "invalidActualCurrentEntityIdColumnName",
+            "invalidActualTargetEntityIdColumnName",
+            validExpectedCurrentEntityIdColumnName,
+            validExpectedTargetEntityIdColumnName,
+            false
+        )
+    );
   }
 
   @Test
