@@ -403,14 +403,6 @@ public interface AbstractJdbcPlusRepository {
    * @param resultSet  the result set
    * @param entity     the entity
    * @param columnsMap a map of column names and fields
-   * @throws SQLException           if a database access error occurs
-   *                                or a method is called on a closed result set
-   * @throws IllegalAccessException when {@link Field#set(Object, Object)}
-   *                                method is called
-   *                                and it is enforcing Java language access
-   *                                control and
-   *                                the underlying field is either inaccessible
-   *                                or final.
    */
   default <X> void populateByColumnsMap(
       final ResultSet resultSet,
@@ -439,14 +431,6 @@ public interface AbstractJdbcPlusRepository {
    *
    * @param resultSet the result set
    * @param entity    the entity
-   * @throws SQLException           if a database access error occurs
-   *                                or a method is called on a closed result set
-   * @throws IllegalAccessException when {@link Field#set(Object, Object)}
-   *                                method is called
-   *                                and it is enforcing Java language access
-   *                                control and
-   *                                the underlying field is either inaccessible
-   *                                or final.
    */
   default <X> void populateColumnFields(
       final ResultSet resultSet,
@@ -462,18 +446,12 @@ public interface AbstractJdbcPlusRepository {
    * @param entity the entity
    * @param field  field that contains @OneToMany|@ManyToMany annotation
    *               and returns a table name
-   * @throws IllegalAccessException when {@link Field#set(Object, Object)}
-   *                                method is called
-   *                                and it is enforcing Java language access
-   *                                control and
-   *                                the underlying field is either inaccessible
-   *                                or final
    */
   default <X> void populateOneToManyField(
       final Field field,
       final X entity,
       final Class<X> clazz
-  ) throws IllegalAccessException {
+  ) {
 
     final String query =
         sqlSelectAllByColumn(
@@ -498,7 +476,7 @@ public interface AbstractJdbcPlusRepository {
       final String query,
       final Function<ResultSet, R> resultSetFunction,
       final Supplier<R> defaultResult
-  ) throws IllegalAccessException {
+  ) {
     final R result = getDatabaseConnection()
         .queryTransaction(
             query,
@@ -506,24 +484,22 @@ public interface AbstractJdbcPlusRepository {
             defaultResult
         );
     field.setAccessible(true);
-    field.set(entity, result);
+    try {
+      field.set(entity, result);
+    } catch (IllegalAccessException e) {
+      e.printStackTrace();
+    }
   }
 
   /**
    * Populate {@link OneToMany} fields.
    *
    * @param entity the entity
-   * @throws IllegalAccessException when {@link Field#set(Object, Object)}
-   *                                method is called
-   *                                and it is enforcing Java language access
-   *                                control and
-   *                                the underlying field is either inaccessible
-   *                                or final
    */
   default <X> void populateOneToManyFields(
       final X entity,
       final Class<X> clazz
-  ) throws IllegalAccessException {
+  ) {
     for (Field field : getOneToManyFields(clazz)) {
       populateOneToManyField(field, entity, clazz);
     }
@@ -535,18 +511,12 @@ public interface AbstractJdbcPlusRepository {
    * @param entity the entity
    * @param field  field that contains @OneToMany|@ManyToMany annotation
    *               and returns a table name
-   * @throws IllegalAccessException when {@link Field#set(Object, Object)}
-   *                                method is called
-   *                                and it is enforcing Java language access
-   *                                control and
-   *                                the underlying field is either inaccessible
-   *                                or final
    */
   default <X> void populateManyToManyField(
       final X entity,
       final Field field,
       final Class<X> clazz
-  ) throws IllegalAccessException {
+  ) {
 
     if (Collection.class.isAssignableFrom(field.getType())) {
 
@@ -627,40 +597,39 @@ public interface AbstractJdbcPlusRepository {
    * @param targetEntityIdColumnName  target entity id column name
    * @return TRUE if result set consists of 2 columns and
    * each column has an association with the entity
-   * @throws SQLException if a database access error occurs
-   *                      or a method is called on a closed result set
    */
   default boolean validManyToManyResultSet(
       final ResultSetMetaData metaData,
       final String currentEntityIdColumnName,
       final String targetEntityIdColumnName
-  ) throws SQLException {
-    return Objects.nonNull(metaData) && metaData.getColumnCount() == 2 && (
-        (
-            metaData.getColumnName(1).equals(currentEntityIdColumnName)
-                && metaData.getColumnName(2).equals(targetEntityIdColumnName)
-        ) || (
-            metaData.getColumnName(2).equals(currentEntityIdColumnName)
-                && metaData.getColumnName(1).equals(targetEntityIdColumnName)
-        )
-    );
+  ) {
+    try {
+      return Objects.nonNull(metaData)
+          && metaData.getColumnCount() == 2
+          && (
+          (
+              metaData.getColumnName(1).equals(currentEntityIdColumnName)
+                  && metaData.getColumnName(2).equals(targetEntityIdColumnName)
+          ) || (
+              metaData.getColumnName(2).equals(currentEntityIdColumnName)
+                  && metaData.getColumnName(1).equals(targetEntityIdColumnName)
+          )
+      );
+    } catch (SQLException e) {
+      e.printStackTrace();
+      return false;
+    }
   }
 
   /**
    * Populate {@link ManyToMany} fields.
    *
    * @param entity the entity
-   * @throws IllegalAccessException when {@link Field#set(Object, Object)}
-   *                                method is called
-   *                                and it is enforcing Java language access
-   *                                control and
-   *                                the underlying field is either inaccessible
-   *                                or final
    */
   default <X> void populateManyToManyFields(
       final X entity,
       final Class<X> clazz
-  ) throws IllegalAccessException {
+  ) {
     for (Field field : getManyToManyFields(clazz)) {
       populateManyToManyField(entity, field, clazz);
     }
