@@ -18,6 +18,9 @@ public class Entity {
   @Column("name")
   private String name;
 
+  @Column("rank")
+  private Integer rank;
+
   @OneToMany(targetEntity = Entity.class)
   private List<Entity> entities;
 }

@@ -29,9 +29,11 @@ public class TestUtils {
     when(entityResultSet.getMetaData()).thenReturn(entityMetaData);
     when(entityResultSet.getObject(1, Integer.class)).thenReturn(entity.getId());
     when(entityResultSet.getObject(2, String.class)).thenReturn(entity.getName());
-    when(entityMetaData.getColumnCount()).thenReturn(2);
+    when(entityResultSet.getObject(3, Integer.class)).thenReturn(entity.getRank());
+    when(entityMetaData.getColumnCount()).thenReturn(3);
     when(entityMetaData.getColumnName(1)).thenReturn("id");
     when(entityMetaData.getColumnName(2)).thenReturn("name");
+    when(entityMetaData.getColumnName(3)).thenReturn("rank");
     return entityResultSet;
   }
 }
