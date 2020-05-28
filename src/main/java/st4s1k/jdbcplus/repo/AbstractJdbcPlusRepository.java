@@ -15,6 +15,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
+import static java.util.function.Predicate.not;
 import static st4s1k.jdbcplus.utils.EntityUtils.*;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.getClassInstance;
 
@@ -333,8 +334,7 @@ public interface AbstractJdbcPlusRepository {
                     field,
                     value
                 ),
-                resultSet ->
-                    getObjects(resultSet, clazz),
+                resultSet -> getObjects(resultSet, clazz),
                 Collections::<X>emptyList
             ))
         .orElse(emptyList());
@@ -350,7 +350,11 @@ public interface AbstractJdbcPlusRepository {
       final Object id,
       final Class<X> clazz
   ) {
-    return Optional.ofNullable(findByColumn(getIdColumnName(clazz), id, clazz).get(0));
+    final List<X> entityList = findByColumn(getIdColumnName(clazz), id, clazz);
+    return Optional.ofNullable(entityList)
+        .filter(not(List::isEmpty))
+        .filter(list -> list.size() == 1)
+        .map(list -> list.get(0));
   }
 
   /**
@@ -365,11 +369,7 @@ public interface AbstractJdbcPlusRepository {
       final Class<X> clazz
   ) {
     final X entity = getClassInstance(clazz);
-    try {
-      populateColumnFields(resultSet, entity, clazz);
-    } catch (IllegalAccessException | SQLException e) {
-      e.printStackTrace();
-    }
+    populateColumnFields(resultSet, entity, clazz);
     return entity;
   }
 
@@ -416,18 +416,20 @@ public interface AbstractJdbcPlusRepository {
       final ResultSet resultSet,
       final X entity,
       final Map<String, Field> columnsMap
-  ) throws SQLException, IllegalAccessException {
-
-    final int columnCount = resultSet.getMetaData().getColumnCount();
-
-    for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
-      final String columnName =
-          resultSet.getMetaData().getColumnName(columnIndex);
-      if (columnsMap.containsKey(columnName)) {
-        final Field column = columnsMap.get(columnName);
-        column.setAccessible(true);
-        column.set(entity, resultSet.getObject(columnIndex, column.getType()));
+  ) {
+    try {
+      final int columnCount = resultSet.getMetaData().getColumnCount();
+      for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
+        final String columnName =
+            resultSet.getMetaData().getColumnName(columnIndex);
+        if (columnsMap.containsKey(columnName)) {
+          final Field column = columnsMap.get(columnName);
+          column.setAccessible(true);
+          column.set(entity, resultSet.getObject(columnIndex, column.getType()));
+        }
       }
+    } catch (SQLException | IllegalAccessException e) {
+      e.printStackTrace();
     }
   }
 
@@ -450,7 +452,7 @@ public interface AbstractJdbcPlusRepository {
       final ResultSet resultSet,
       final X entity,
       final Class<X> clazz
-  ) throws SQLException, IllegalAccessException {
+  ) {
     populateByColumnsMap(resultSet, entity, getColumnsMap(clazz));
   }
 
