@@ -18,7 +18,7 @@ import static java.util.Collections.emptyList;
 import static st4s1k.jdbcplus.utils.EntityUtils.*;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.getClassInstance;
 
-public interface AbstractRepository {
+public interface AbstractJdbcPlusRepository {
 
   /**
    * Get database connection object.
@@ -43,10 +43,10 @@ public interface AbstractRepository {
       return String.valueOf(value);
     } else {
       if (value instanceof Object[]) {
-        var objArr = (Object[]) value;
+        Object[] objArr = (Object[]) value;
         if (value instanceof String[] ||
             value instanceof Character[]) {
-          final var strArr = (Object[]) value;
+          final Object[] strArr = (Object[]) value;
           objArr = new String[strArr.length];
           for (int i = 0; i < strArr.length; i++) {
             objArr[i] = "'" + strArr[i] + "'";
@@ -60,8 +60,8 @@ public interface AbstractRepository {
       } else if (value instanceof short[]) {
         return Arrays.toString((short[]) value);
       } else if (value instanceof char[]) {
-        final var charArr = (char[]) value;
-        final var newCharArr = new String[charArr.length];
+        final char[] charArr = (char[]) value;
+        final String[] newCharArr = new String[charArr.length];
         for (int i = 0; i < charArr.length; i++) {
           newCharArr[i] = "'" + charArr[i] + "'";
         }
@@ -87,13 +87,13 @@ public interface AbstractRepository {
    */
   default <X> String sqlRemove(
       final X entity,
-      final Class<X> clazz) {
+      final Class<X> clazz
+  ) {
     final String table = getTableName(clazz);
     final String id = getIdColumnName(clazz);
     final Object idColumnValue = getIdColumnValue(entity, clazz);
     final String value = getStringValueForSql(idColumnValue);
-    return "delete from " + table + " where " + id + " = " + value + " " +
-        "returning *";
+    return String.format("delete from %s where %s = %s returning *", table, id, value);
   }
 
   /**
@@ -104,8 +104,9 @@ public interface AbstractRepository {
    */
   default <X> String sqlInsert(
       final X entity,
-      final Class<X> clazz) {
-    final String table = getTableName(entity.getClass());
+      final Class<X> clazz
+  ) {
+    final String table = getTableName(clazz);
     final StringBuilder columns = new StringBuilder();
     final StringBuilder values = new StringBuilder();
     final String[] fieldNames = getColumnNames(entity.getClass());
@@ -120,8 +121,7 @@ public interface AbstractRepository {
         values.append(fieldValues[i]);
       }
     }
-    return "insert into " + table + "(" + columns + ") values (" + values + ") "
-        + "returning *";
+    return String.format("insert into %s(%s) values (%s) returning *", table, columns, values);
   }
 
   /**
@@ -132,14 +132,15 @@ public interface AbstractRepository {
    */
   default <X> String sqlUpdate(
       final X entity,
-      final Class<X> clazz) {
+      final Class<X> clazz
+  ) {
     final String table = getTableName(clazz);
-    final var idColumnName = getIdColumnName(clazz);
-    final var idValue = getIdColumnValue(entity, clazz);
-    final var idStringValue = getStringValueForSql(idValue);
-    final var fieldNames = getColumnNames(clazz);
-    final var fieldValues = getColumnValuesAsString(entity, clazz);
-    final var columns = new StringBuilder();
+    final String idColumnName = getIdColumnName(clazz);
+    final Object idValue = getIdColumnValue(entity, clazz);
+    final String idStringValue = getStringValueForSql(idValue);
+    final String[] fieldNames = getColumnNames(clazz);
+    final String[] fieldValues = getColumnValuesAsString(entity, clazz);
+    final StringBuilder columns = new StringBuilder();
     for (int i = 0; i < fieldNames.length; i++) {
       if (fieldNames[i].equals(idColumnName)) {
         continue;
@@ -150,9 +151,13 @@ public interface AbstractRepository {
       columns.append(fieldNames[i]).append(" = ").append(fieldValues[i]);
     }
     return columns.length() == 0 ? "" :
-        "update " + table + " set " + columns
-            + " where " + idColumnName + " = " + idStringValue
-            + " returning *";
+        String.format(
+            "update %s set %s where %s = %s returning *",
+            table,
+            columns,
+            idColumnName,
+            idStringValue
+        );
   }
 
   /**
@@ -162,7 +167,7 @@ public interface AbstractRepository {
    * @return SQL query string
    */
   default String sqlSelectAll(final String table) {
-    return "select * from " + table;
+    return String.format("select * from %s", table);
   }
 
   /**
@@ -176,9 +181,13 @@ public interface AbstractRepository {
   default String sqlSelectAllByColumn(
       final String table,
       final String column,
-      final Object value) {
-    return sqlSelectAllByColumns(table, new String[]{column},
-        new Object[]{value});
+      final Object value
+  ) {
+    return sqlSelectAllByColumns(
+        table,
+        new String[]{column},
+        new Object[]{value}
+    );
   }
 
   /**
@@ -192,7 +201,8 @@ public interface AbstractRepository {
   default String sqlSelectAllByColumns(
       final String table,
       final String[] columns,
-      final Object[] values) {
+      final Object[] values
+  ) {
     if (columns.length > 0 && columns.length == values.length) {
       final StringBuilder conditions = new StringBuilder();
       for (int i = 0; i < columns.length; i++) {
@@ -216,11 +226,14 @@ public interface AbstractRepository {
    */
   default <X> Optional<X> save(
       final X entity,
-      final Class<X> clazz) {
+      final Class<X> clazz
+  ) {
     return getDatabaseConnection()
-        .queryTransaction(sqlInsert(entity, clazz),
+        .queryTransaction(
+            sqlInsert(entity, clazz),
             resultSet -> Optional.ofNullable(getObject(resultSet, clazz)),
-            Optional::empty);
+            Optional::empty
+        );
   }
 
   /**
@@ -231,12 +244,15 @@ public interface AbstractRepository {
    */
   default <X> Optional<X> update(
       final X entity,
-      final Class<X> clazz) {
+      final Class<X> clazz
+  ) {
     return findById(getIdColumnValue(entity, clazz), clazz)
         .flatMap(e -> getDatabaseConnection()
-            .queryTransaction(sqlUpdate(e, clazz),
+            .queryTransaction(
+                sqlUpdate(e, clazz),
                 resultSet -> Optional.ofNullable(getObject(resultSet, clazz)),
-                Optional::empty));
+                Optional::empty
+            ));
   }
 
   /**
@@ -247,12 +263,15 @@ public interface AbstractRepository {
    */
   default <X> Optional<X> remove(
       final X entity,
-      final Class<X> clazz) {
+      final Class<X> clazz
+  ) {
     return findById(getIdColumnValue(entity, clazz), clazz)
         .flatMap(e -> getDatabaseConnection()
-            .queryTransaction(sqlRemove(e, clazz),
+            .queryTransaction(
+                sqlRemove(e, clazz),
                 resultSet -> Optional.ofNullable(getObject(resultSet, clazz)),
-                Optional::empty));
+                Optional::empty
+            ));
   }
 
   /**
@@ -263,16 +282,19 @@ public interface AbstractRepository {
    */
   default <X> List<X> find(
       final X entity,
-      final Class<X> clazz) {
+      final Class<X> clazz
+  ) {
     return Optional.ofNullable(entity)
         .map(e -> getDatabaseConnection()
             .queryTransaction(
                 sqlSelectAllByColumns(
                     getTableName(clazz),
                     getColumnNames(clazz),
-                    getColumnValues(entity, clazz)),
+                    getColumnValues(entity, clazz)
+                ),
                 resultSet -> getObjects(resultSet, clazz),
-                Collections::<X>emptyList))
+                Collections::<X>emptyList
+            ))
         .orElse(emptyList());
   }
 
@@ -283,9 +305,11 @@ public interface AbstractRepository {
    */
   default <X> List<X> findAll(final Class<X> clazz) {
     return getDatabaseConnection()
-        .queryTransaction(sqlSelectAll(getTableName(clazz)),
+        .queryTransaction(
+            sqlSelectAll(getTableName(clazz)),
             resultSet -> getObjects(resultSet, clazz),
-            Collections::emptyList);
+            Collections::emptyList
+        );
   }
 
   /**
@@ -299,17 +323,20 @@ public interface AbstractRepository {
   default <X> List<X> findByColumn(
       final String column,
       final Object value,
-      final Class<X> clazz) {
+      final Class<X> clazz
+  ) {
     return Optional.ofNullable(column)
         .map(field -> getDatabaseConnection()
             .queryTransaction(
                 sqlSelectAllByColumn(
                     getTableName(clazz),
                     field,
-                    value),
+                    value
+                ),
                 resultSet ->
                     getObjects(resultSet, clazz),
-                Collections::<X>emptyList))
+                Collections::<X>emptyList
+            ))
         .orElse(emptyList());
   }
 
@@ -321,7 +348,8 @@ public interface AbstractRepository {
    */
   default <X> Optional<X> findById(
       final Object id,
-      final Class<X> clazz) {
+      final Class<X> clazz
+  ) {
     return Optional.ofNullable(findByColumn(getIdColumnName(clazz), id, clazz).get(0));
   }
 
@@ -330,12 +358,12 @@ public interface AbstractRepository {
    *
    * @param resultSet the result set
    * @param clazz     entity class object
-   * @param <X>       entity specific type
    * @return extracted entity
    */
   default <X> X getObject(
       final ResultSet resultSet,
-      final Class<X> clazz) {
+      final Class<X> clazz
+  ) {
     final X entity = getClassInstance(clazz);
     try {
       populateColumnFields(resultSet, entity, clazz);
@@ -350,12 +378,12 @@ public interface AbstractRepository {
    *
    * @param resultSet the result set
    * @param clazz     entity class object
-   * @param <X>       entity specific type
    * @return a list of extracted entities
    */
   default <X> List<X> getObjects(
       final ResultSet resultSet,
-      final Class<X> clazz) {
+      final Class<X> clazz
+  ) {
     final List<X> list = new ArrayList<>();
     try {
       while (resultSet.next()) {
@@ -387,7 +415,8 @@ public interface AbstractRepository {
   default <X> void populateByColumnsMap(
       final ResultSet resultSet,
       final X entity,
-      final Map<String, Field> columnsMap) throws SQLException, IllegalAccessException {
+      final Map<String, Field> columnsMap
+  ) throws SQLException, IllegalAccessException {
 
     final int columnCount = resultSet.getMetaData().getColumnCount();
 
@@ -420,7 +449,8 @@ public interface AbstractRepository {
   default <X> void populateColumnFields(
       final ResultSet resultSet,
       final X entity,
-      final Class<X> clazz) throws SQLException, IllegalAccessException {
+      final Class<X> clazz
+  ) throws SQLException, IllegalAccessException {
     populateByColumnsMap(resultSet, entity, getColumnsMap(clazz));
   }
 
@@ -440,14 +470,24 @@ public interface AbstractRepository {
   default <X> void populateOneToManyField(
       final Field field,
       final X entity,
-      final Class<X> clazz) throws IllegalAccessException {
+      final Class<X> clazz
+  ) throws IllegalAccessException {
 
     final String query =
-        sqlSelectAllByColumn(getTableName(getTargetEntity(field)),
-            getIdColumnName(clazz), getIdColumnValue(entity, clazz));
+        sqlSelectAllByColumn(
+            getTableName(clazz),
+            getIdColumnName(clazz),
+            getIdColumnValue(entity, clazz)
+        );
 
-    populateField(field, entity, query, resultSet -> getObjects(resultSet,
-        getTargetEntity(field)), Collections::emptyList);
+    populateField(
+        field, entity, query,
+        resultSet -> getObjects(
+            resultSet,
+            getTargetEntity(field)
+        ),
+        Collections::emptyList
+    );
   }
 
   default <X, R> void populateField(
@@ -455,11 +495,14 @@ public interface AbstractRepository {
       final X entity,
       final String query,
       final Function<ResultSet, R> resultSetFunction,
-      final Supplier<R> defaultResult) throws IllegalAccessException {
-
-    final R result = getDatabaseConnection().queryTransaction(query,
-        resultSetFunction, defaultResult);
-
+      final Supplier<R> defaultResult
+  ) throws IllegalAccessException {
+    final R result = getDatabaseConnection()
+        .queryTransaction(
+            query,
+            resultSetFunction,
+            defaultResult
+        );
     field.setAccessible(true);
     field.set(entity, result);
   }
@@ -477,7 +520,8 @@ public interface AbstractRepository {
    */
   default <X> void populateOneToManyFields(
       final X entity,
-      final Class<X> clazz) throws IllegalAccessException {
+      final Class<X> clazz
+  ) throws IllegalAccessException {
     for (Field field : getOneToManyFields(clazz)) {
       populateOneToManyField(field, entity, clazz);
     }
@@ -499,23 +543,34 @@ public interface AbstractRepository {
   default <X> void populateManyToManyField(
       final X entity,
       final Field field,
-      final Class<X> clazz) throws IllegalAccessException {
+      final Class<X> clazz
+  ) throws IllegalAccessException {
 
     if (Collection.class.isAssignableFrom(field.getType())) {
 
       final Class<X> targetEntity = getTargetEntity(field);
       final String currentEntityIdColumnName = getIdColumnName(clazz);
-      final String targetEntityIdColumnName = getTableName(targetEntity);
-      final String query = sqlSelectAllByColumn(getJoinTableName(field),
-          currentEntityIdColumnName, getIdColumnValue(entity, clazz));
+      final String targetEntityIdColumnName = getTableName(clazz);
+      final String query = sqlSelectAllByColumn(
+          getJoinTableName(field),
+          currentEntityIdColumnName,
+          getIdColumnValue(entity, clazz)
+      );
 
-      populateField(field, entity, query,
-          resultSet -> fetchRelatedEntities(resultSet,
-              currentEntityIdColumnName, targetEntityIdColumnName,
-              targetEntity), Collections::emptyList);
+      populateField(
+          field, entity, query,
+          resultSet -> fetchRelatedEntities(
+              resultSet,
+              currentEntityIdColumnName,
+              targetEntityIdColumnName,
+              targetEntity
+          ),
+          Collections::emptyList
+      );
     } else {
-      throw new InvalidMappingException("@ManyToMany annotated field is not of "
-          + "a collection type!");
+      throw new InvalidMappingException(
+          "@ManyToMany annotated field is not of a collection type!"
+      );
     }
   }
 
@@ -533,12 +588,17 @@ public interface AbstractRepository {
       final ResultSet resultSet,
       final String currentEntityIdColumnName,
       final String targetEntityIdColumnName,
-      final Class<X> targetEntity) {
+      final Class<X> targetEntity
+  ) {
     final List<X> list = new ArrayList<>();
     try {
       final ResultSetMetaData metaData = resultSet.getMetaData();
-      if (validManyToManyResultSet(metaData, currentEntityIdColumnName,
-          targetEntityIdColumnName)) {
+      final boolean validManyToManyResultSet = validManyToManyResultSet(
+          metaData,
+          currentEntityIdColumnName,
+          targetEntityIdColumnName
+      );
+      if (validManyToManyResultSet) {
         while (resultSet.next()) {
           Object targetEntityIdColumnValue =
               targetEntityIdColumnName.equals(metaData.getColumnName(1)) ?
@@ -547,7 +607,8 @@ public interface AbstractRepository {
         }
       } else {
         throw new InvalidResultSetException(
-            "Result set columns do not match related entities' id columns!");
+            "Result set columns do not match related entities' id columns!"
+        );
       }
     } catch (SQLException | InvalidResultSetException e) {
       e.printStackTrace();
@@ -570,7 +631,8 @@ public interface AbstractRepository {
   default boolean validManyToManyResultSet(
       final ResultSetMetaData metaData,
       final String currentEntityIdColumnName,
-      final String targetEntityIdColumnName) throws SQLException {
+      final String targetEntityIdColumnName
+  ) throws SQLException {
     return Objects.nonNull(metaData) && metaData.getColumnCount() == 2 && (
         (
             metaData.getColumnName(1).equals(currentEntityIdColumnName)
@@ -595,7 +657,8 @@ public interface AbstractRepository {
    */
   default <X> void populateManyToManyFields(
       final X entity,
-      final Class<X> clazz) throws IllegalAccessException {
+      final Class<X> clazz
+  ) throws IllegalAccessException {
     for (Field field : getManyToManyFields(clazz)) {
       populateManyToManyField(entity, field, clazz);
     }

@@ -2,19 +2,24 @@ package st4s1k.jdbcplus.repo;
 
 import st4s1k.jdbcplus.utils.EntityUtils;
 
+import java.lang.reflect.ParameterizedType;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-interface GenericRepository<T> extends AbstractRepository {
+interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
 
   /**
    * Get the entity class.
    *
    * @return the class of the entity
    */
-  Class<T> getEntityClass();
+  @SuppressWarnings("unchecked")
+  private Class<T> getEntityClass() {
+    return (Class<T>) ((ParameterizedType) this.getClass().getGenericSuperclass())
+        .getActualTypeArguments()[0];
+  }
 
   /**
    * Get database table name associated with the entity.
