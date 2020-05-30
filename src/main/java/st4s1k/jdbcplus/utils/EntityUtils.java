@@ -1,31 +1,36 @@
 package st4s1k.jdbcplus.utils;
 
-import lombok.extern.slf4j.Slf4j;
 import st4s1k.jdbcplus.annotations.*;
+import st4s1k.jdbcplus.exceptions.InvalidColumnTypeException;
 import st4s1k.jdbcplus.exceptions.InvalidMappingException;
+import st4s1k.jdbcplus.exceptions.MissingAnnotationException;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import static java.lang.System.Logger.Level.ERROR;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.concatenateArrays;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.toSnakeLowerCase;
 
-@Slf4j
 public class EntityUtils {
+
+  private static final System.Logger LOGGER = System.getLogger("EntityUtils");
 
   private EntityUtils() {
   }
 
   public static Field[] getFieldsAnnotatedWith(
       final Class<? extends Annotation> annotation,
-      final Class<?> clazz) {
+      final Class<?> clazz
+  ) {
     return Optional.ofNullable(clazz)
         .map(c -> Arrays.stream(c.getDeclaredFields())
             .filter(field -> field.isAnnotationPresent(annotation))
@@ -35,7 +40,8 @@ public class EntityUtils {
 
   public static Map<String, Field> getFieldsMap(
       final Field[] fields,
-      final Function<Field, String> keyGenerator) {
+      final Function<Field, String> keyGenerator
+  ) {
     return Arrays.stream(fields).collect(toMap(keyGenerator, field -> field));
   }
 
@@ -43,7 +49,8 @@ public class EntityUtils {
     if (Optional.ofNullable(clazz).isPresent() &&
         !clazz.isAnnotationPresent(Table.class)) {
       throw new InvalidMappingException(
-          "Missing @Table annotation in class " + clazz.getName());
+          "Missing @Table annotation in class " + clazz.getName()
+      );
     }
     return Optional.ofNullable(clazz)
         .map(c -> c.getAnnotation(Table.class))
@@ -52,14 +59,16 @@ public class EntityUtils {
   }
 
   public static Field getIdColumn(final Class<?> clazz) {
-    final var idFields = Arrays.asList(getFieldsAnnotatedWith(Id.class, clazz));
+    final List<Field> idFields = Arrays.asList(getFieldsAnnotatedWith(Id.class, clazz));
     if (idFields.isEmpty()) {
       throw new InvalidMappingException(
-          "Missing @Id annotation in class " + clazz.getName());
+          "Missing @Id annotation in class " + clazz.getName()
+      );
     }
     if (idFields.size() > 1) {
       throw new InvalidMappingException(
-          "Too many @Id annotated columns in class " + clazz.getName());
+          "Too many @Id annotated columns in class " + clazz.getName()
+      );
     }
     return idFields.get(0);
   }
@@ -74,8 +83,15 @@ public class EntityUtils {
       return field.isAnnotationPresent(Column.class)
           ? field.getAnnotation(Column.class).value()
           : toSnakeLowerCase(field.getName());
+    } else {
+      throw new MissingAnnotationException(
+          String.format(
+              "Missing @Id annotation on this field (%s %s)",
+              field.getType().getName(),
+              field.getName()
+          )
+      );
     }
-    return null;
   }
 
   public static Field[] getColumns(final Class<?> clazz) {
@@ -84,7 +100,8 @@ public class EntityUtils {
         new Field[]{getIdColumn(clazz)},
         getColumnFields(clazz),
         getOneToOneFields(clazz),
-        getManyToOneFields(clazz));
+        getManyToOneFields(clazz)
+    );
   }
 
   public static Field[] getColumnFields(final Class<?> clazz) {
@@ -206,25 +223,28 @@ public class EntityUtils {
     return concatenateArrays(
         Field.class,
         getOneToManyFields(clazz),
-        getManyToManyFields(clazz));
+        getManyToManyFields(clazz)
+    );
   }
 
   public static <T> Object getColumnValue(
       final Field field,
-      final T entity) {
+      final T entity
+  ) {
     final Predicate<Field> hasColumnAnnotation = f -> f.isAnnotationPresent(Column.class);
     final Predicate<Field> hasIdAnnotation = f -> f.isAnnotationPresent(Id.class);
     final Predicate<Field> hasJoinColumnAnnotation = f -> f.isAnnotationPresent(JoinColumn.class);
+    final Predicate<Field> isColumn = hasColumnAnnotation
+        .or(hasJoinColumnAnnotation)
+        .or(hasIdAnnotation);
     return Optional.ofNullable(field)
-        .filter(hasColumnAnnotation
-            .or(hasJoinColumnAnnotation)
-            .or(hasIdAnnotation))
+        .filter(isColumn)
         .map(column -> {
           try {
             column.setAccessible(true);
             return column.get(entity);
           } catch (IllegalAccessException e) {
-            log.error(e.getLocalizedMessage(), e);
+            LOGGER.log(ERROR, e.getLocalizedMessage(), e);
             return null;
           }
         })
@@ -233,33 +253,53 @@ public class EntityUtils {
 
   public static <T> Object[] getColumnValues(
       final T entity,
-      final Class<?> clazz) {
+      final Class<?> clazz
+  ) {
     return Arrays.stream(getColumns(clazz))
         .map(f -> getColumnValue(f, entity))
         .toArray();
   }
 
-  public static <T> String[] getColumnValuesAsString(
+  public static <T> String[] getColumnValuesAsStringForSQL(
       final T entity,
-      final Class<?> clazz) {
+      final Class<?> clazz
+  ) {
     return Arrays.stream(getColumns(clazz))
         .map(f -> getColumnValue(f, entity))
-        .map(v -> v instanceof String
-            ? "'" + v + "'"
-            : v.toString())
+        .map(EntityUtils::getStringValueForSQL)
         .toArray(String[]::new);
   }
 
   public static <T> Object getIdColumnValue(
       final T entity,
-      final Class<?> clazz) {
+      final Class<?> clazz
+  ) {
     try {
-      final var idColumn = getIdColumn(clazz);
+      final Field idColumn = getIdColumn(clazz);
       idColumn.setAccessible(true);
       return idColumn.get(entity);
     } catch (IllegalAccessException e) {
-      log.error(e.getLocalizedMessage(), e);
+      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
       return null;
+    }
+  }
+
+  /**
+   * Get {@link String} value for building SQL query.
+   *
+   * @return string value
+   */
+  public static String getStringValueForSQL(final Object value) {
+    if (value == null) {
+      return "NULL";
+    } else if (!value.getClass().isArray()) {
+      if (value instanceof String ||
+          value instanceof Character) {
+        return "'" + value + "'";
+      }
+      return String.valueOf(value);
+    } else {
+      throw new InvalidColumnTypeException();
     }
   }
 }

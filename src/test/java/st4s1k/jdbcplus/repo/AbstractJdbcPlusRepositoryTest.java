@@ -65,31 +65,6 @@ class AbstractJdbcPlusRepositoryTest {
     return newEntity;
   }
 
-  @ParameterizedTest
-  @MethodSource("parametersForGetStringValueForSql")
-  void testGetStringValueForSql(final Object value, final String expectedValue) {
-    final var stringValue = abstractJdbcPlusRepository.getStringValueForSql(value);
-    assertThat(stringValue).isEqualTo(expectedValue);
-  }
-
-  private static Stream<Arguments> parametersForGetStringValueForSql() {
-    return Stream.of(
-        arguments(1, "1"),
-        arguments("1", "'1'"),
-        arguments(null, "NULL"),
-        arguments(new long[]{1, 2, 3}, "[1, 2, 3]"),
-        arguments(new int[]{1, 2, 3}, "[1, 2, 3]"),
-        arguments(new short[]{1, 2, 3}, "[1, 2, 3]"),
-        arguments(new char[]{'a', 'b', 'c'}, "['a', 'b', 'c']"),
-        arguments(new byte[]{1, 2, 3}, "[1, 2, 3]"),
-        arguments(new boolean[]{true, false, true}, "[true, false, true]"),
-        arguments(new float[]{1.0f, 2.0f, 3.0f}, "[1.0, 2.0, 3.0]"),
-        arguments(new double[]{1.0d, 2.0d, 3.0d}, "[1.0, 2.0, 3.0]"),
-        arguments(new String[]{"a", "b", "c"}, "['a', 'b', 'c']"),
-        arguments("abc", "'abc'")
-    );
-  }
-
   @Test
   void testSqlRemove() {
     final var result = abstractJdbcPlusRepository.sqlRemove(entity, Entity.class);
