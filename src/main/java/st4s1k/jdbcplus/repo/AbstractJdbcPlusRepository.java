@@ -392,28 +392,27 @@ public interface AbstractJdbcPlusRepository {
    * Populate one {@link OneToMany} field.
    *
    * @param entity the entity
-   * @param field  field that contains @OneToMany|@ManyToMany annotation
-   *               and returns a table name
+   * @param field  field that contains @OneToMany annotation
    */
   default <X> void populateOneToManyField(
       final Field field,
       final X entity,
       final Class<X> clazz
   ) {
-
-    final String query =
-        sqlSelectAllByColumn(
-            getTableName(clazz),
-            getIdColumnName(clazz),
-            getIdColumnValue(entity, clazz)
-        );
+    final Class<?> targetEntity = getTargetEntity(field);
+    final String targetEntityTableName = getTableName(targetEntity);
+    final Field manyToOneField = getManyToOneField(targetEntity, clazz);
+    final String targetEntityManyToOneColumnName = getColumnName(manyToOneField);
+    final Object currentEntityIdColumnValue = getIdColumnValue(entity, clazz);
+    final String query = sqlSelectAllByColumn(
+        targetEntityTableName,
+        targetEntityManyToOneColumnName,
+        currentEntityIdColumnValue
+    );
 
     populateField(
         field, entity, query,
-        resultSet -> getObjects(
-            resultSet,
-            getTargetEntity(field)
-        ),
+        resultSet -> getObjects(resultSet, targetEntity),
         Collections::emptyList
     );
   }
@@ -468,7 +467,7 @@ public interface AbstractJdbcPlusRepository {
 
     if (Collection.class.isAssignableFrom(field.getType())) {
 
-      final Class<X> targetEntity = getTargetEntity(field);
+      final Class<?> targetEntity = getTargetEntity(field);
       final String currentEntityIdColumnName = getIdColumnName(clazz);
       final String targetEntityIdColumnName = getTableName(clazz);
       final String query = sqlSelectAllByColumn(

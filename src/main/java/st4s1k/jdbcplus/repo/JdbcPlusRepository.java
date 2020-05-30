@@ -99,7 +99,8 @@ interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
    */
   default List<T> findByColumn(
       final String column,
-      final Object value) {
+      final Object value
+  ) {
     return findByColumn(column, value, getEntityClass());
   }
 

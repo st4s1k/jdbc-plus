@@ -1,16 +1,13 @@
 package st4s1k.jdbcplus.repo;
 
 import lombok.Data;
-import st4s1k.jdbcplus.annotations.Column;
-import st4s1k.jdbcplus.annotations.Id;
-import st4s1k.jdbcplus.annotations.OneToMany;
-import st4s1k.jdbcplus.annotations.Table;
+import st4s1k.jdbcplus.annotations.*;
 
 import java.util.List;
 
 @Data
-@Table("entities")
-public class Entity {
+@Table("entity3s")
+public class Entity3 {
 
   @Id
   private Integer id;
@@ -21,9 +18,10 @@ public class Entity {
   @Column("rank")
   private Integer rank;
 
-  @OneToMany(targetEntity = Entity1.class)
+  @ManyToMany
+  @JoinTable("entity1s_entity3s")
   private List<Entity1> entity1s;
 
-  @OneToMany
+  @OneToMany(targetEntity = Entity2.class)
   private List<Entity2> entity2s;
 }
