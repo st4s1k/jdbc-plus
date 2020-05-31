@@ -18,8 +18,7 @@ public class Entity3 {
   @Column("rank")
   private Integer rank;
 
-  @ManyToMany
-  @JoinTable("entity1s_entity3s")
+  @ManyToMany(mappedBy = "entity3s")
   private List<Entity1> entity1s;
 
   @OneToMany(targetEntity = Entity2.class)

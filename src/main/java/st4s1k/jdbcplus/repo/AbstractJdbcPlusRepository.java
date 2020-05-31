@@ -7,7 +7,6 @@ import st4s1k.jdbcplus.exceptions.InvalidResultSetException;
 
 import java.lang.reflect.Field;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.function.Function;
@@ -200,12 +199,10 @@ public interface AbstractJdbcPlusRepository {
       final Class<X> clazz
   ) {
     return findById(getIdColumnValue(entity, clazz), clazz)
-        .flatMap(e -> getDatabaseConnection()
-            .queryTransaction(
-                sqlUpdate(e, clazz),
-                resultSet -> Optional.ofNullable(getObject(resultSet, clazz)),
-                Optional::empty
-            ));
+        .flatMap(e -> getDatabaseConnection().queryTransaction(
+            sqlUpdate(e, clazz),
+            resultSet -> getObject(resultSet, clazz)
+        ));
   }
 
   /**
@@ -219,12 +216,10 @@ public interface AbstractJdbcPlusRepository {
       final Class<X> clazz
   ) {
     return findById(getIdColumnValue(entity, clazz), clazz)
-        .flatMap(e -> getDatabaseConnection()
-            .queryTransaction(
-                sqlRemove(e, clazz),
-                resultSet -> Optional.ofNullable(getObject(resultSet, clazz)),
-                Optional::empty
-            ));
+        .flatMap(e -> getDatabaseConnection().queryTransaction(
+            sqlRemove(e, clazz),
+            resultSet -> getObject(resultSet, clazz)
+        ));
   }
 
   /**
@@ -295,7 +290,8 @@ public interface AbstractJdbcPlusRepository {
   /**
    * Find entity by id and given Class.
    *
-   * @param id entity id
+   * @param id    entity id
+   * @param clazz entity class
    * @return {@link Optional} found entity
    */
   default <X> Optional<X> findById(
@@ -459,23 +455,26 @@ public interface AbstractJdbcPlusRepository {
   /**
    * Populate one {@link ManyToMany} field.
    *
-   * @param entity the entity
    * @param field  field that contains @OneToMany|@ManyToMany annotation
    *               and returns a table name
+   * @param entity the entity
+   * @param clazz  entity class
+   * @param <X>    entity type
    */
   default <X> void populateManyToManyField(
-      final X entity,
       final Field field,
+      final X entity,
       final Class<X> clazz
   ) {
     if (Collection.class.isAssignableFrom(field.getType())) {
       final Class<?> targetEntity = getTargetEntity(field);
-      final JoinTable joinTable = getJoinTable(field);
-      final String currentEntityIdColumnName = getEntityJoinColumnName(
-          clazz, joinTable.joinColumn()
-      );
+      final JoinTable joinTable = getJoinTable(field, targetEntity);
+      final JoinColumn joinColumn = joinTable.joinColumn();
+      final JoinColumn inverseJoinColumn = joinTable.inverseJoinColumn();
+      final String currentEntityIdColumnName = getEntityJoinColumnName(clazz, joinColumn);
       final String targetEntityIdColumnName = getEntityJoinColumnName(
-          targetEntity, joinTable.inverseJoinColumn()
+          targetEntity,
+          inverseJoinColumn
       );
       final String query = sqlSelectAllByColumn(
           joinTable.value(),
@@ -484,9 +483,8 @@ public interface AbstractJdbcPlusRepository {
       );
       populateField(
           field, entity, query,
-          resultSet -> fetchRelatedEntities(
+          resultSet -> fetchEntitiesByIdColumn(
               resultSet,
-              currentEntityIdColumnName,
               targetEntityIdColumnName,
               targetEntity
           ),
@@ -499,84 +497,46 @@ public interface AbstractJdbcPlusRepository {
     }
   }
 
-  default String getEntityJoinColumnName(
-      final Class<?> clazz,
-      final JoinColumn joinColumn
-  ) {
-    return "".equals(joinColumn.value())
-        ? getJoinTableColumnName(clazz)
-        : joinColumn.value();
-  }
-
   /**
    * Fetch all the entities related to the current entity.
    *
-   * @param resultSet                 the result set
-   * @param currentEntityIdColumnName current entity id column name
-   * @param targetEntityIdColumnName  target entity id column name
-   * @param targetEntity              class object of the target entity
-   * @param <X>                       specific type of the target entity
+   * @param resultSet    the result set
+   * @param idColumnName target entity id column name
+   * @param clazz        class object of the target entity
+   * @param <X>          specific type of the target entity
    * @return a list of related entities
    */
-  default <X> List<X> fetchRelatedEntities(
+  default <X> List<X> fetchEntitiesByIdColumn(
       final ResultSet resultSet,
-      final String currentEntityIdColumnName,
-      final String targetEntityIdColumnName,
-      final Class<X> targetEntity
+      final String idColumnName,
+      final Class<X> clazz
   ) {
     final List<X> list = new ArrayList<>();
     try {
-      final ResultSetMetaData metaData = resultSet.getMetaData();
-      validateManyToManyResultSet(
-          metaData,
-          currentEntityIdColumnName,
-          targetEntityIdColumnName
-      );
       while (resultSet.next()) {
-        final Object targetEntityIdColumnValue;
-        if (targetEntityIdColumnName.equals(metaData.getColumnName(1))) {
-          targetEntityIdColumnValue = resultSet.getObject(1);
-        } else {
-          targetEntityIdColumnValue = resultSet.getObject(2);
-        }
-        findById(targetEntityIdColumnValue, targetEntity).ifPresent(list::add);
+        final int idColumnNumber = getColumnNumber(resultSet, idColumnName);
+        final Object idColumnValue = resultSet.getObject(idColumnNumber);
+        final X foundEntity = findById(idColumnValue, clazz)
+            .orElseThrow(() -> new InvalidResultSetException(String.format(
+                "Cannot find entity %s by id: %s", clazz.getName(), idColumnValue
+            )));
+        list.add(foundEntity);
       }
-    } catch (SQLException | InvalidResultSetException e) {
+    } catch (SQLException e) {
       LOGGER.log(ERROR, e.getLocalizedMessage(), e);
       return emptyList();
     }
     return list;
   }
 
-  /**
-   * Validate {@link ManyToMany} join-table.
-   *
-   * @param metaData                  result set meta-data
-   * @param currentEntityIdColumnName current entity id column name
-   * @param targetEntityIdColumnName  target entity id column name
-   *                                  each column has an association with the entity
-   */
-  default void validateManyToManyResultSet(
-      final ResultSetMetaData metaData,
-      final String currentEntityIdColumnName,
-      final String targetEntityIdColumnName
-  ) {
-    boolean isValid;
+  private int getColumnNumber(final ResultSet resultSet, final String columnName) {
     try {
-      isValid = Objects.nonNull(metaData)
-          && metaData.getColumnCount() == 2
-          && ((metaData.getColumnName(1).equals(currentEntityIdColumnName)
-          && metaData.getColumnName(2).equals(targetEntityIdColumnName))
-          || (metaData.getColumnName(2).equals(currentEntityIdColumnName)
-          && metaData.getColumnName(1).equals(targetEntityIdColumnName)));
+      return resultSet.findColumn(columnName);
     } catch (SQLException e) {
-      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
-      isValid = false;
-    }
-    if (!isValid) {
-      throw new InvalidResultSetException(
-          "Result set columns do not match related entities' id columns!"
-      );
+      throw new InvalidResultSetException(String.format(
+          "Result set column does not exist: %s",
+          columnName
+      ));
     }
   }
 
@@ -590,7 +550,7 @@ public interface AbstractJdbcPlusRepository {
       final Class<X> clazz
   ) {
     for (Field field : getManyToManyFields(clazz)) {
-      populateManyToManyField(entity, field, clazz);
+      populateManyToManyField(field, entity, clazz);
     }
   }
 }

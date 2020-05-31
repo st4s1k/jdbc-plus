@@ -27,6 +27,9 @@ public class Entity1 {
   private List<Entity2> entity2s;
 
   @ManyToMany
-  @JoinTable("entity1s_entity3s")
+  @JoinTable(
+      value = "entity1s_entity3s",
+      joinColumn = @JoinColumn("id1"),
+      inverseJoinColumn = @JoinColumn("id3"))
   private List<Entity3> entity3s;
 }

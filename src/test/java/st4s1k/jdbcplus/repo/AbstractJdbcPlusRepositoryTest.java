@@ -4,29 +4,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.function.Executable;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import st4s1k.jdbcplus.annotations.JoinColumn;
+import st4s1k.jdbcplus.annotations.JoinTable;
 import st4s1k.jdbcplus.config.DatabaseConnection;
-import st4s1k.jdbcplus.exceptions.InvalidResultSetException;
 
 import java.lang.reflect.Field;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static st4s1k.jdbcplus.repo.TestUtils.assertEntitiesAreEqualByColumnValues;
@@ -227,10 +219,11 @@ class AbstractJdbcPlusRepositoryTest {
     final var expectedQuery = abstractJdbcPlusRepository.sqlUpdate(entity, Entity.class);
     when(databaseConnection.queryTransaction(eq(selectQuery), any(), any()))
         .thenReturn(List.of(entity));
-    when(databaseConnection.queryTransaction(eq(expectedQuery), any(), any()))
+    when(databaseConnection.queryTransaction(eq(expectedQuery), any()))
         .thenReturn(Optional.of(entity));
     abstractJdbcPlusRepository.update(entity, Entity.class);
-    verify(databaseConnection).queryTransaction(eq(expectedQuery), any(), any());
+    verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());;
+    verify(databaseConnection).queryTransaction(eq(expectedQuery), any());
   }
 
   @Test
@@ -243,10 +236,11 @@ class AbstractJdbcPlusRepositoryTest {
     final var expectedQuery = abstractJdbcPlusRepository.sqlRemove(entity, Entity.class);
     when(databaseConnection.queryTransaction(eq(selectQuery), any(), any()))
         .thenReturn(List.of(entity));
-    when(databaseConnection.queryTransaction(eq(expectedQuery), any(), any()))
+    when(databaseConnection.queryTransaction(eq(expectedQuery), any()))
         .thenReturn(Optional.of(entity));
     abstractJdbcPlusRepository.remove(entity, Entity.class);
-    verify(databaseConnection).queryTransaction(eq(expectedQuery), any(), any());
+    verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());;
+    verify(databaseConnection).queryTransaction(eq(expectedQuery), any());
   }
 
   @Test
@@ -377,15 +371,17 @@ class AbstractJdbcPlusRepositoryTest {
   @Test
   void testPopulateManyToManyField() throws NoSuchFieldException {
     final var field = Entity1.class.getDeclaredField("entity3s");
+    final JoinTable joinTable = getJoinTable(field, Entity3.class);
+    final JoinColumn joinColumn = joinTable.joinColumn();
     final var query = abstractJdbcPlusRepository.sqlSelectAllByColumn(
         getJoinTableName(field),
-        getJoinTableColumnName(Entity1.class),
+        getEntityJoinColumnName(Entity1.class, joinColumn),
         getIdColumnValue(entity1, Entity1.class)
     );
     final var newEntity3 = getEntity3(40, "SomeEntity4", 9);
     when(databaseConnection.queryTransaction(eq(query), any(), any()))
         .thenReturn(List.of(newEntity3));
-    abstractJdbcPlusRepository.populateManyToManyField(entity1, field, Entity1.class);
+    abstractJdbcPlusRepository.populateManyToManyField(field, entity1, Entity1.class);
     assertThat(entity1.getEntity3s()).containsOnly(newEntity3);
   }
 
@@ -398,109 +394,14 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   @Disabled
-  void testFetchRelatedEntities() {
+  void testFetchEntitiesByIdColumn() {
     final var resultSet = mock(ResultSet.class);
-    final var result = abstractJdbcPlusRepository.fetchRelatedEntities(
+    final String idColumnName = "idColumnName";
+    final var result = abstractJdbcPlusRepository.fetchEntitiesByIdColumn(
         resultSet,
-        getIdColumnName(Entity1.class),
-        "targetEntityIdColumnName",
+        idColumnName,
         Entity.class
     );
     assertThat(result).isEqualTo(singletonList(entity));
-  }
-
-  @ParameterizedTest
-  @MethodSource("parametersForValidManyToManyResultSet")
-  void testValidManyToManyResultSet(
-      final int columnCount,
-      final String actualCurrentEntityIdColumnName,
-      final String actualTargetEntityIdColumnName,
-      final String expectedCurrentEntityIdColumnNameBar,
-      final String expectedTargetEntityIdColumnNameBar,
-      final boolean validArguments
-  ) throws Throwable {
-    final var metaData = mock(ResultSetMetaData.class);
-
-    when(metaData.getColumnCount()).thenReturn(columnCount);
-    lenient().when(metaData.getColumnName(1)).thenReturn(actualCurrentEntityIdColumnName);
-    lenient().when(metaData.getColumnName(2)).thenReturn(actualTargetEntityIdColumnName);
-
-    final var call = (Executable) () -> abstractJdbcPlusRepository.validateManyToManyResultSet(
-        metaData,
-        expectedCurrentEntityIdColumnNameBar,
-        expectedTargetEntityIdColumnNameBar
-    );
-
-    if (validArguments) {
-      assertDoesNotThrow(call);
-    } else {
-      assertThrows(InvalidResultSetException.class, call);
-    }
-  }
-
-  private static Stream<Arguments> parametersForValidManyToManyResultSet() {
-    final var validNumberOfColumns = 2;
-    final var validActualCurrentEntityIdColumnName = "currentEntityIdColumnName";
-    final var validActualTargetEntityIdColumnName = "targetEntityIdColumnName";
-    final var validExpectedCurrentEntityIdColumnName = "currentEntityIdColumnName";
-    final var validExpectedTargetEntityIdColumnName = "targetEntityIdColumnName";
-    return Stream.of(
-        arguments(
-            validNumberOfColumns,
-            validActualCurrentEntityIdColumnName,
-            validActualTargetEntityIdColumnName,
-            validExpectedCurrentEntityIdColumnName,
-            validExpectedTargetEntityIdColumnName,
-            true
-        ),
-        arguments(
-            validNumberOfColumns,
-            validActualCurrentEntityIdColumnName,
-            validActualTargetEntityIdColumnName,
-            validExpectedTargetEntityIdColumnName,
-            validExpectedCurrentEntityIdColumnName,
-            true
-        ),
-        arguments(
-            1,
-            validActualCurrentEntityIdColumnName,
-            validActualTargetEntityIdColumnName,
-            validExpectedCurrentEntityIdColumnName,
-            validExpectedTargetEntityIdColumnName,
-            false
-        ),
-        arguments(
-            3,
-            validActualCurrentEntityIdColumnName,
-            validActualTargetEntityIdColumnName,
-            validExpectedCurrentEntityIdColumnName,
-            validExpectedTargetEntityIdColumnName,
-            false
-        ),
-        arguments(
-            validNumberOfColumns,
-            "invalidActualCurrentEntityIdColumnName",
-            validActualTargetEntityIdColumnName,
-            validExpectedCurrentEntityIdColumnName,
-            validExpectedTargetEntityIdColumnName,
-            false
-        ),
-        arguments(
-            validNumberOfColumns,
-            validActualCurrentEntityIdColumnName,
-            "invalidActualTargetEntityIdColumnName",
-            validExpectedCurrentEntityIdColumnName,
-            validExpectedTargetEntityIdColumnName,
-            false
-        ),
-        arguments(
-            validNumberOfColumns,
-            "invalidActualCurrentEntityIdColumnName",
-            "invalidActualTargetEntityIdColumnName",
-            validExpectedCurrentEntityIdColumnName,
-            validExpectedTargetEntityIdColumnName,
-            false
-        )
-    );
   }
 }

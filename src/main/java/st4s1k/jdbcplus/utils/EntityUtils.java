@@ -31,6 +31,15 @@ public class EntityUtils {
         .getActualTypeArguments()[0];
   }
 
+  public static Field getField(final Class<?> clazz, final String fieldName) {
+    try {
+      return clazz.getDeclaredField(fieldName);
+    } catch (NoSuchFieldException e) {
+      final String message = String.format("No such field field %s#%s", clazz.getName(), fieldName);
+      throw new RuntimeException(message, e);
+    }
+  }
+
   public static Field[] getFieldsAnnotatedWith(
       final Class<? extends Annotation> annotation,
       final Class<?> clazz
@@ -87,7 +96,7 @@ public class EntityUtils {
     requireNonNull(field);
     if (field.isAnnotationPresent(Id.class)) {
       return field.isAnnotationPresent(Column.class)
-          ? field.getAnnotation(Column.class).value()
+          ? getAnnotation(field, Column.class).value()
           : toSnakeLowerCase(field.getName());
     } else {
       throw new MissingAnnotationException(String.format(
@@ -114,7 +123,7 @@ public class EntityUtils {
 
   public static String getColumnName(final Field field) {
     if (field.isAnnotationPresent(Column.class)) {
-      return field.getAnnotation(Column.class).value();
+      return getAnnotation(field, Column.class).value();
     } else if (field.isAnnotationPresent(JoinColumn.class)) {
       return getJoinColumnName(field);
     } else if (field.isAnnotationPresent(Id.class)) {
@@ -132,7 +141,7 @@ public class EntityUtils {
   public static String getJoinColumnName(final Field field) {
     requireNonNull(field);
     if (field.isAnnotationPresent(JoinColumn.class)) {
-      return field.getAnnotation(JoinColumn.class).value();
+      return getAnnotation(field, JoinColumn.class).value();
     }
     return null;
   }
@@ -214,12 +223,33 @@ public class EntityUtils {
     return fieldType;
   }
 
-  public static JoinTable getJoinTable(final Field field) {
-    return field.getAnnotation(JoinTable.class);
+  public static <A extends Annotation> A getAnnotation(
+      final Field field,
+      final Class<A> annotationClass
+  ) {
+    return Optional.ofNullable(field.getAnnotation(annotationClass))
+        .orElseThrow(() -> new InvalidMappingException(String.format(
+            "Missing @%s annotation on field %s",
+            annotationClass.getSimpleName(),
+            field.getName()
+        )));
+  }
+
+  public static JoinTable getJoinTable(
+      final Field manyToManyField,
+      final Class<?> targetEntity
+  ) {
+    final String mappedBy = getAnnotation(manyToManyField, ManyToMany.class).mappedBy();
+    if ("".equals(mappedBy)) {
+      return getAnnotation(manyToManyField, JoinTable.class);
+    } else {
+      final Field mappedByField = getField(targetEntity, mappedBy);
+      return getAnnotation(mappedByField, JoinTable.class);
+    }
   }
 
   public static String getJoinTableName(final Field field) {
-    return field.getAnnotation(JoinTable.class).value();
+    return getAnnotation(field, JoinTable.class).value();
   }
 
   public static String getJoinTableColumnName(final Class<?> entityClass) {
