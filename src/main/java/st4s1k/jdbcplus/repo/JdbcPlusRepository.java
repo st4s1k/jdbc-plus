@@ -8,7 +8,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
+public final class JdbcPlusRepository<T> {
+
+  private final AbstractJdbcPlusRepository abstractJdbcPlusRepository;
+
+  public JdbcPlusRepository(final AbstractJdbcPlusRepository abstractJdbcPlusRepository) {
+    this.abstractJdbcPlusRepository = abstractJdbcPlusRepository;
+  }
 
   /**
    * Get the entity class.
@@ -26,7 +32,7 @@ interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
    *
    * @return table name
    */
-  default String getTableName() {
+  public String getTableName() {
     return EntityUtils.getTableName(getEntityClass());
   }
 
@@ -36,8 +42,8 @@ interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return {@link Optional} saved entity
    */
-  default Optional<T> save(final T entity) {
-    return save(entity, getEntityClass());
+  public Optional<T> save(final T entity) {
+    return abstractJdbcPlusRepository.save(entity, getEntityClass());
   }
 
   /**
@@ -46,8 +52,8 @@ interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return {@link Optional} updated entity
    */
-  default Optional<T> update(final T entity) {
-    return update(entity, getEntityClass());
+  public Optional<T> update(final T entity) {
+    return abstractJdbcPlusRepository.update(entity, getEntityClass());
   }
 
   /**
@@ -56,8 +62,8 @@ interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return {@link Optional} removed entity
    */
-  default Optional<T> remove(final T entity) {
-    return remove(entity, getEntityClass());
+  public Optional<T> remove(final T entity) {
+    return abstractJdbcPlusRepository.remove(entity, getEntityClass());
   }
 
   /**
@@ -66,8 +72,8 @@ interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return a list of found entities
    */
-  default List<T> find(final T entity) {
-    return find(entity, getEntityClass());
+  public List<T> find(final T entity) {
+    return abstractJdbcPlusRepository.find(entity, getEntityClass());
   }
 
   /**
@@ -76,8 +82,8 @@ interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
    * @param id entity id
    * @return {@link Optional} found entity
    */
-  default Optional<T> findById(final Object id) {
-    return findById(id, getEntityClass());
+  public Optional<T> findById(final Object id) {
+    return abstractJdbcPlusRepository.findById(id, getEntityClass());
   }
 
   /**
@@ -85,8 +91,8 @@ interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
    *
    * @return a list of found entities
    */
-  default List<T> findAll() {
-    return findAll(getEntityClass());
+  public List<T> findAll() {
+    return abstractJdbcPlusRepository.findAll(getEntityClass());
   }
 
   /**
@@ -97,11 +103,11 @@ interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
    * @param value  specified value
    * @return a list of found entities
    */
-  default List<T> findByColumn(
+  public List<T> findByColumn(
       final String column,
       final Object value
   ) {
-    return findByColumn(column, value, getEntityClass());
+    return abstractJdbcPlusRepository.findByColumn(column, value, getEntityClass());
   }
 
   /**
@@ -110,8 +116,8 @@ interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
    * @param resultSet the result set
    * @return extracted entity
    */
-  default T getObject(final ResultSet resultSet) {
-    return getObject(resultSet, getEntityClass());
+  public T getObject(final ResultSet resultSet) {
+    return abstractJdbcPlusRepository.getObject(resultSet, getEntityClass());
   }
 
   /**
@@ -120,7 +126,7 @@ interface JdbcPlusRepository<T> extends AbstractJdbcPlusRepository {
    * @param resultSet the result set
    * @return a list of extracted entities
    */
-  default List<T> getObjects(final ResultSet resultSet) {
-    return new ArrayList<>(getObjects(resultSet, getEntityClass()));
+  public List<T> getObjects(final ResultSet resultSet) {
+    return new ArrayList<>(abstractJdbcPlusRepository.getObjects(resultSet, getEntityClass()));
   }
 }

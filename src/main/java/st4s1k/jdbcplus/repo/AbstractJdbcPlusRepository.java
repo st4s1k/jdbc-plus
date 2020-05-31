@@ -20,16 +20,24 @@ import static java.util.function.Predicate.not;
 import static st4s1k.jdbcplus.utils.EntityUtils.*;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.getClassInstance;
 
-public interface AbstractJdbcPlusRepository {
+public final class AbstractJdbcPlusRepository {
 
-  Logger LOGGER = getLogger("AbstractJdbcPlusRepository");
+  private final Logger logger;
 
-  /**
-   * Get database connection object.
-   *
-   * @return database connection
-   */
-  DatabaseConnection getDatabaseConnection();
+  private final DatabaseConnection databaseConnection;
+
+  public AbstractJdbcPlusRepository(final DatabaseConnection databaseConnection) {
+    this.databaseConnection = databaseConnection;
+    logger = getLogger("AbstractJdbcPlusRepository");
+  }
+
+  public AbstractJdbcPlusRepository(
+      final DatabaseConnection databaseConnection,
+      final Logger logger
+  ) {
+    this.logger = logger;
+    this.databaseConnection = databaseConnection;
+  }
 
   /**
    * Generates REMOVE sql query for an entity.
@@ -37,7 +45,7 @@ public interface AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return SQL query string
    */
-  default <X> String sqlRemove(
+  public <X> String sqlRemove(
       final X entity,
       final Class<X> clazz
   ) {
@@ -54,7 +62,7 @@ public interface AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return SQL query string
    */
-  default <X> String sqlInsert(
+  public <X> String sqlInsert(
       final X entity,
       final Class<X> clazz
   ) {
@@ -82,7 +90,7 @@ public interface AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return SQL query string
    */
-  default <X> String sqlUpdate(
+  public <X> String sqlUpdate(
       final X entity,
       final Class<X> clazz
   ) {
@@ -118,7 +126,7 @@ public interface AbstractJdbcPlusRepository {
    * @param table the database table
    * @return SQL query string
    */
-  default String sqlSelectAll(final String table) {
+  public String sqlSelectAll(final String table) {
     return String.format("select * from %s", table);
   }
 
@@ -130,7 +138,7 @@ public interface AbstractJdbcPlusRepository {
    * @param value  the column value
    * @return SQL query string
    */
-  default String sqlSelectAllByColumn(
+  public String sqlSelectAllByColumn(
       final String table,
       final String column,
       final Object value
@@ -150,7 +158,7 @@ public interface AbstractJdbcPlusRepository {
    * @param values  the column value
    * @return SQL query string
    */
-  default String sqlSelectAllByColumns(
+  public String sqlSelectAllByColumns(
       final String table,
       final String[] columns,
       final Object[] values
@@ -176,11 +184,11 @@ public interface AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return {@link Optional} saved entity
    */
-  default <X> Optional<X> save(
+  public <X> Optional<X> save(
       final X entity,
       final Class<X> clazz
   ) {
-    return getDatabaseConnection()
+    return databaseConnection
         .queryTransaction(
             sqlInsert(entity, clazz),
             resultSet -> Optional.ofNullable(getObject(resultSet, clazz)),
@@ -194,12 +202,12 @@ public interface AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return {@link Optional} updated entity
    */
-  default <X> Optional<X> update(
+  public <X> Optional<X> update(
       final X entity,
       final Class<X> clazz
   ) {
     return findById(getIdColumnValue(entity, clazz), clazz)
-        .flatMap(e -> getDatabaseConnection().queryTransaction(
+        .flatMap(e -> databaseConnection.queryTransaction(
             sqlUpdate(e, clazz),
             resultSet -> getObject(resultSet, clazz)
         ));
@@ -211,12 +219,12 @@ public interface AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return {@link Optional} removed entity
    */
-  default <X> Optional<X> remove(
+  public <X> Optional<X> remove(
       final X entity,
       final Class<X> clazz
   ) {
     return findById(getIdColumnValue(entity, clazz), clazz)
-        .flatMap(e -> getDatabaseConnection().queryTransaction(
+        .flatMap(e -> databaseConnection.queryTransaction(
             sqlRemove(e, clazz),
             resultSet -> getObject(resultSet, clazz)
         ));
@@ -228,12 +236,12 @@ public interface AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return a list of found entities
    */
-  default <X> List<X> find(
+  public <X> List<X> find(
       final X entity,
       final Class<X> clazz
   ) {
     return Optional.ofNullable(entity)
-        .map(e -> getDatabaseConnection()
+        .map(e -> databaseConnection
             .queryTransaction(
                 sqlSelectAllByColumns(
                     getTableName(clazz),
@@ -251,8 +259,8 @@ public interface AbstractJdbcPlusRepository {
    *
    * @return a list of found entities
    */
-  default <X> List<X> findAll(final Class<X> clazz) {
-    return getDatabaseConnection()
+  public <X> List<X> findAll(final Class<X> clazz) {
+    return databaseConnection
         .queryTransaction(
             sqlSelectAll(getTableName(clazz)),
             resultSet -> getObjects(resultSet, clazz),
@@ -268,13 +276,13 @@ public interface AbstractJdbcPlusRepository {
    * @param value  specified value
    * @return a list of found entities
    */
-  default <X> List<X> findByColumn(
+  public <X> List<X> findByColumn(
       final String column,
       final Object value,
       final Class<X> clazz
   ) {
     return Optional.ofNullable(column)
-        .map(field -> getDatabaseConnection()
+        .map(field -> databaseConnection
             .queryTransaction(
                 sqlSelectAllByColumn(
                     getTableName(clazz),
@@ -294,7 +302,7 @@ public interface AbstractJdbcPlusRepository {
    * @param clazz entity class
    * @return {@link Optional} found entity
    */
-  default <X> Optional<X> findById(
+  public <X> Optional<X> findById(
       final Object id,
       final Class<X> clazz
   ) {
@@ -312,7 +320,7 @@ public interface AbstractJdbcPlusRepository {
    * @param clazz     entity class object
    * @return extracted entity
    */
-  default <X> X getObject(
+  public <X> X getObject(
       final ResultSet resultSet,
       final Class<X> clazz
   ) {
@@ -328,7 +336,7 @@ public interface AbstractJdbcPlusRepository {
    * @param clazz     entity class object
    * @return a list of extracted entities
    */
-  default <X> List<X> getObjects(
+  public <X> List<X> getObjects(
       final ResultSet resultSet,
       final Class<X> clazz
   ) {
@@ -338,7 +346,7 @@ public interface AbstractJdbcPlusRepository {
         Optional.ofNullable(getObject(resultSet, clazz)).ifPresent(list::add);
       }
     } catch (SQLException e) {
-      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
+      logger.log(ERROR, e.getLocalizedMessage(), e);
       return emptyList();
     }
     return list;
@@ -352,7 +360,7 @@ public interface AbstractJdbcPlusRepository {
    * @param entity     the entity
    * @param columnsMap a map of column names and fields
    */
-  default <X> void populateByColumnsMap(
+  public <X> void populateByColumnsMap(
       final ResultSet resultSet,
       final X entity,
       final Map<String, Field> columnsMap
@@ -369,7 +377,7 @@ public interface AbstractJdbcPlusRepository {
         }
       }
     } catch (SQLException | IllegalAccessException e) {
-      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
+      logger.log(ERROR, e.getLocalizedMessage(), e);
     }
   }
 
@@ -380,7 +388,7 @@ public interface AbstractJdbcPlusRepository {
    * @param resultSet the result set
    * @param entity    the entity
    */
-  default <X> void populateColumnFields(
+  public <X> void populateColumnFields(
       final ResultSet resultSet,
       final X entity,
       final Class<X> clazz
@@ -394,7 +402,7 @@ public interface AbstractJdbcPlusRepository {
    * @param entity the entity
    * @param field  field that contains @OneToMany annotation
    */
-  default <X> void populateOneToManyField(
+  public <X> void populateOneToManyField(
       final Field field,
       final X entity,
       final Class<X> clazz
@@ -417,14 +425,14 @@ public interface AbstractJdbcPlusRepository {
     );
   }
 
-  default <X, R> void populateField(
+  public <X, R> void populateField(
       final Field field,
       final X entity,
       final String query,
       final Function<ResultSet, R> resultSetFunction,
       final Supplier<R> defaultResult
   ) {
-    final R result = getDatabaseConnection()
+    final R result = databaseConnection
         .queryTransaction(
             query,
             resultSetFunction,
@@ -434,7 +442,7 @@ public interface AbstractJdbcPlusRepository {
     try {
       field.set(entity, result);
     } catch (IllegalAccessException e) {
-      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
+      logger.log(ERROR, e.getLocalizedMessage(), e);
     }
   }
 
@@ -443,7 +451,7 @@ public interface AbstractJdbcPlusRepository {
    *
    * @param entity the entity
    */
-  default <X> void populateOneToManyFields(
+  public <X> void populateOneToManyFields(
       final X entity,
       final Class<X> clazz
   ) {
@@ -461,7 +469,7 @@ public interface AbstractJdbcPlusRepository {
    * @param clazz  entity class
    * @param <X>    entity type
    */
-  default <X> void populateManyToManyField(
+  public <X> void populateManyToManyField(
       final Field field,
       final X entity,
       final Class<X> clazz
@@ -506,7 +514,7 @@ public interface AbstractJdbcPlusRepository {
    * @param <X>          specific type of the target entity
    * @return a list of related entities
    */
-  default <X> List<X> fetchEntitiesByIdColumn(
+  public <X> List<X> fetchEntitiesByIdColumn(
       final ResultSet resultSet,
       final String idColumnName,
       final Class<X> clazz
@@ -523,7 +531,7 @@ public interface AbstractJdbcPlusRepository {
         list.add(foundEntity);
       }
     } catch (SQLException e) {
-      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
+      logger.log(ERROR, e.getLocalizedMessage(), e);
       return emptyList();
     }
     return list;
@@ -545,7 +553,7 @@ public interface AbstractJdbcPlusRepository {
    *
    * @param entity the entity
    */
-  default <X> void populateManyToManyFields(
+  public <X> void populateManyToManyFields(
       final X entity,
       final Class<X> clazz
   ) {

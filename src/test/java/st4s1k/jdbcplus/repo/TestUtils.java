@@ -4,6 +4,8 @@ import lombok.SneakyThrows;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,6 +60,22 @@ public class TestUtils {
       entity.setEntity2s(entity2s);
     }
     return entity;
+  }
+
+  public static List<Entity> getEntities(
+      final int initialId,
+      final int numberOfEntities
+  ) {
+    final var entities = new ArrayList<Entity>(numberOfEntities);
+    for (var i = 0; i < numberOfEntities; i++) {
+      final var id = initialId + i;
+      final var name = "SomeEntity" + id;
+      final var entity1s = Collections.<Entity1>emptyList();
+      final var entity2s = Collections.<Entity2>emptyList();
+      final var entity = getEntity(id, name, i, entity1s, entity2s);
+      entities.add(entity);
+    }
+    return entities;
   }
 
   public static Entity1 getEntity1(
