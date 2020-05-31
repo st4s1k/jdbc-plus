@@ -42,43 +42,19 @@ class AbstractJdbcPlusRepositoryTest {
   void setUp() {
     abstractJdbcPlusRepository = () -> databaseConnection;
     entity3 = getEntity3(30, "SomeEntity3", 8);
-    entity2 = getEntity2(20, "SomeEntity2", 7);
-    entity1 = getEntity1(10, "SomeEntity1", 6);
-    entity = getEntity(1, "SomeEntity", 5);
-  }
-
-  private Entity getEntity(
-      final int id,
-      final String name,
-      final int rank
-  ) {
-    return TestUtils.getEntity(
-        id, name, rank,
-        List.of(entity1),
-        List.of(entity2)
+    entity2 = TestUtils.getEntity2(
+        20, "SomeEntity2", 7,
+        entity, entity3
     );
-  }
-
-  private Entity1 getEntity1(
-      final int id,
-      final String name,
-      final int rank
-  ) {
-    return TestUtils.getEntity1(
-        id, name, rank,
+    entity1 = TestUtils.getEntity1(
+        10, "SomeEntity1", 6,
         List.of(entity2),
         List.of(entity3)
     );
-  }
-
-  private Entity2 getEntity2(
-      final int id,
-      final String name,
-      final int rank
-  ) {
-    return TestUtils.getEntity2(
-        id, name, rank,
-        entity, entity3
+    entity = TestUtils.getEntity(
+        1, "SomeEntity", 5,
+        List.of(entity1),
+        List.of(entity2)
     );
   }
 
@@ -222,7 +198,7 @@ class AbstractJdbcPlusRepositoryTest {
     when(databaseConnection.queryTransaction(eq(expectedQuery), any()))
         .thenReturn(Optional.of(entity));
     abstractJdbcPlusRepository.update(entity, Entity.class);
-    verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());;
+    verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());
     verify(databaseConnection).queryTransaction(eq(expectedQuery), any());
   }
 
@@ -239,7 +215,7 @@ class AbstractJdbcPlusRepositoryTest {
     when(databaseConnection.queryTransaction(eq(expectedQuery), any()))
         .thenReturn(Optional.of(entity));
     abstractJdbcPlusRepository.remove(entity, Entity.class);
-    verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());;
+    verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());
     verify(databaseConnection).queryTransaction(eq(expectedQuery), any());
   }
 
