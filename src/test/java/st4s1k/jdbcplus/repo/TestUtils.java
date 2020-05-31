@@ -1,7 +1,6 @@
 package st4s1k.jdbcplus.repo;
 
 import lombok.SneakyThrows;
-import org.mockito.AdditionalAnswers;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -26,19 +25,8 @@ public class TestUtils {
     assertThat(entity1ColumnValues).containsExactly(entity2ColumnValues);
   }
 
-  /**
-   * This method overcomes the issue with the original Mockito.spy when passing a lambda which fails with an error
-   * saying that the passed class is final.
-   */
-  public static <T> T spyLambda(
-      final Class<T> lambdaType,
-      final T lambda
-  ) {
-    return mock(lambdaType, AdditionalAnswers.delegatesTo(lambda));
-  }
-
   @SneakyThrows
-  public static ResultSet getResultSet(final Entity entity) {
+  public static ResultSet getEntityResultSet(final Entity entity) {
     final var entityResultSet = mock(ResultSet.class);
     final var entityMetaData = mock(ResultSetMetaData.class);
     when(entityResultSet.getMetaData()).thenReturn(entityMetaData);

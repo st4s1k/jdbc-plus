@@ -4,14 +4,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import st4s1k.jdbcplus.config.DatabaseConnection;
+import st4s1k.jdbcplus.exceptions.InvalidResultSetException;
 
 import java.lang.reflect.Field;
+import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -21,6 +24,8 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -43,12 +48,9 @@ class AbstractJdbcPlusRepositoryTest {
 
   @BeforeEach
   void setUp() {
-    abstractJdbcPlusRepository = TestUtils.spyLambda(
-        AbstractJdbcPlusRepository.class,
-        () -> databaseConnection
-    );
-    entity3 = getEntity3(30, "SomeEntity1", 8);
-    entity2 = getEntity2(20, "SomeEntity1", 7);
+    abstractJdbcPlusRepository = () -> databaseConnection;
+    entity3 = getEntity3(30, "SomeEntity3", 8);
+    entity2 = getEntity2(20, "SomeEntity2", 7);
     entity1 = getEntity1(10, "SomeEntity1", 6);
     entity = getEntity(1, "SomeEntity", 5);
   }
@@ -294,14 +296,14 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testGetObject() {
-    final var entityResultSet = TestUtils.getResultSet(entity);
+    final var entityResultSet = TestUtils.getEntityResultSet(entity);
     final var result = abstractJdbcPlusRepository.getObject(entityResultSet, Entity.class);
     assertEntitiesAreEqualByColumnValues(result, entity);
   }
 
   @Test
   void testGetObjects() throws SQLException {
-    final var entityResultSet = TestUtils.getResultSet(entity);
+    final var entityResultSet = TestUtils.getEntityResultSet(entity);
     when(entityResultSet.next())
         .thenReturn(true)
         .thenReturn(false);
@@ -313,7 +315,7 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testPopulateByColumnsMap() throws NoSuchFieldException {
-    final var entityResultSet = TestUtils.getResultSet(entity);
+    final var entityResultSet = TestUtils.getEntityResultSet(entity);
     final var columnsMap = new HashMap<String, Field>();
     columnsMap.put("id", getIdColumn(Entity.class));
     columnsMap.put("name", Entity.class.getDeclaredField("name"));
@@ -325,7 +327,7 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testPopulateColumnFields() {
-    final var entityResultSet = TestUtils.getResultSet(entity);
+    final var entityResultSet = TestUtils.getEntityResultSet(entity);
     final var newEntity = new Entity();
     abstractJdbcPlusRepository.populateColumnFields(entityResultSet, newEntity, Entity.class);
     assertEntitiesAreEqualByColumnValues(newEntity, entity);
@@ -373,26 +375,34 @@ class AbstractJdbcPlusRepositoryTest {
   }
 
   @Test
-  @Disabled
-  void testPopulateManyToManyField() {
-    // TODO: Implement this test
-    abstractJdbcPlusRepository.populateManyToManyField(entity, null, Entity.class);
+  void testPopulateManyToManyField() throws NoSuchFieldException {
+    final var field = Entity1.class.getDeclaredField("entity3s");
+    final var query = abstractJdbcPlusRepository.sqlSelectAllByColumn(
+        getJoinTableName(field),
+        getJoinTableColumnName(Entity1.class),
+        getIdColumnValue(entity1, Entity1.class)
+    );
+    final var newEntity3 = getEntity3(40, "SomeEntity4", 9);
+    when(databaseConnection.queryTransaction(eq(query), any(), any()))
+        .thenReturn(List.of(newEntity3));
+    abstractJdbcPlusRepository.populateManyToManyField(entity1, field, Entity1.class);
+    assertThat(entity1.getEntity3s()).containsOnly(newEntity3);
   }
 
   @Test
-  @Disabled
   void testPopulateManyToManyFields() {
-    // TODO: Implement this test
-    abstractJdbcPlusRepository.populateManyToManyFields(entity, Entity.class);
+    abstractJdbcPlusRepository.populateManyToManyFields(entity1, Entity1.class);
+    final var numberOfFields = getManyToManyFields(Entity1.class).length;
+    verify(databaseConnection, times(numberOfFields)).queryTransaction(any(), any(), any());
   }
 
   @Test
   @Disabled
   void testFetchRelatedEntities() {
-    // TODO: Implement this test
+    final var resultSet = mock(ResultSet.class);
     final var result = abstractJdbcPlusRepository.fetchRelatedEntities(
-        null,
-        "currentEntityIdColumnName",
+        resultSet,
+        getIdColumnName(Entity1.class),
         "targetEntityIdColumnName",
         Entity.class
     );
@@ -407,21 +417,25 @@ class AbstractJdbcPlusRepositoryTest {
       final String actualTargetEntityIdColumnName,
       final String expectedCurrentEntityIdColumnNameBar,
       final String expectedTargetEntityIdColumnNameBar,
-      final boolean expectedResult
-  ) throws SQLException {
+      final boolean validArguments
+  ) throws Throwable {
     final var metaData = mock(ResultSetMetaData.class);
 
     when(metaData.getColumnCount()).thenReturn(columnCount);
     lenient().when(metaData.getColumnName(1)).thenReturn(actualCurrentEntityIdColumnName);
     lenient().when(metaData.getColumnName(2)).thenReturn(actualTargetEntityIdColumnName);
 
-    final var actualResult = abstractJdbcPlusRepository.validManyToManyResultSet(
+    final var call = (Executable) () -> abstractJdbcPlusRepository.validateManyToManyResultSet(
         metaData,
         expectedCurrentEntityIdColumnNameBar,
         expectedTargetEntityIdColumnNameBar
     );
 
-    assertThat(actualResult).isEqualTo(expectedResult);
+    if (validArguments) {
+      assertDoesNotThrow(call);
+    } else {
+      assertThrows(InvalidResultSetException.class, call);
+    }
   }
 
   private static Stream<Arguments> parametersForValidManyToManyResultSet() {

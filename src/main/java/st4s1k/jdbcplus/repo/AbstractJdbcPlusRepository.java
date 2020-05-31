@@ -1,7 +1,6 @@
 package st4s1k.jdbcplus.repo;
 
-import st4s1k.jdbcplus.annotations.ManyToMany;
-import st4s1k.jdbcplus.annotations.OneToMany;
+import st4s1k.jdbcplus.annotations.*;
 import st4s1k.jdbcplus.config.DatabaseConnection;
 import st4s1k.jdbcplus.exceptions.InvalidMappingException;
 import st4s1k.jdbcplus.exceptions.InvalidResultSetException;
@@ -14,12 +13,17 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static java.lang.System.Logger;
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.getLogger;
 import static java.util.Collections.emptyList;
 import static java.util.function.Predicate.not;
 import static st4s1k.jdbcplus.utils.EntityUtils.*;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.getClassInstance;
 
 public interface AbstractJdbcPlusRepository {
+
+  Logger LOGGER = getLogger("AbstractJdbcPlusRepository");
 
   /**
    * Get database connection object.
@@ -338,7 +342,7 @@ public interface AbstractJdbcPlusRepository {
         Optional.ofNullable(getObject(resultSet, clazz)).ifPresent(list::add);
       }
     } catch (SQLException e) {
-      e.printStackTrace();
+      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
       return emptyList();
     }
     return list;
@@ -369,7 +373,7 @@ public interface AbstractJdbcPlusRepository {
         }
       }
     } catch (SQLException | IllegalAccessException e) {
-      e.printStackTrace();
+      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
     }
   }
 
@@ -401,7 +405,7 @@ public interface AbstractJdbcPlusRepository {
   ) {
     final Class<?> targetEntity = getTargetEntity(field);
     final String targetEntityTableName = getTableName(targetEntity);
-    final Field manyToOneField = getManyToOneField(targetEntity, clazz);
+    final Field manyToOneField = getRelationalField(targetEntity, clazz, ManyToOne.class);
     final String targetEntityManyToOneColumnName = getColumnName(manyToOneField);
     final Object currentEntityIdColumnValue = getIdColumnValue(entity, clazz);
     final String query = sqlSelectAllByColumn(
@@ -434,7 +438,7 @@ public interface AbstractJdbcPlusRepository {
     try {
       field.set(entity, result);
     } catch (IllegalAccessException e) {
-      e.printStackTrace();
+      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
     }
   }
 
@@ -464,18 +468,20 @@ public interface AbstractJdbcPlusRepository {
       final Field field,
       final Class<X> clazz
   ) {
-
     if (Collection.class.isAssignableFrom(field.getType())) {
-
       final Class<?> targetEntity = getTargetEntity(field);
-      final String currentEntityIdColumnName = getIdColumnName(clazz);
-      final String targetEntityIdColumnName = getTableName(clazz);
+      final JoinTable joinTable = getJoinTable(field);
+      final String currentEntityIdColumnName = getEntityJoinColumnName(
+          clazz, joinTable.joinColumn()
+      );
+      final String targetEntityIdColumnName = getEntityJoinColumnName(
+          targetEntity, joinTable.inverseJoinColumn()
+      );
       final String query = sqlSelectAllByColumn(
-          getJoinTableName(field),
+          joinTable.value(),
           currentEntityIdColumnName,
           getIdColumnValue(entity, clazz)
       );
-
       populateField(
           field, entity, query,
           resultSet -> fetchRelatedEntities(
@@ -491,6 +497,15 @@ public interface AbstractJdbcPlusRepository {
           "@ManyToMany annotated field is not of a collection type!"
       );
     }
+  }
+
+  default String getEntityJoinColumnName(
+      final Class<?> clazz,
+      final JoinColumn joinColumn
+  ) {
+    return "".equals(joinColumn.value())
+        ? getJoinTableColumnName(clazz)
+        : joinColumn.value();
   }
 
   /**
@@ -512,25 +527,22 @@ public interface AbstractJdbcPlusRepository {
     final List<X> list = new ArrayList<>();
     try {
       final ResultSetMetaData metaData = resultSet.getMetaData();
-      final boolean validManyToManyResultSet = validManyToManyResultSet(
+      validateManyToManyResultSet(
           metaData,
           currentEntityIdColumnName,
           targetEntityIdColumnName
       );
-      if (validManyToManyResultSet) {
-        while (resultSet.next()) {
-          Object targetEntityIdColumnValue =
-              targetEntityIdColumnName.equals(metaData.getColumnName(1)) ?
-                  resultSet.getObject(1) : resultSet.getObject(2);
-          findById(targetEntityIdColumnValue, targetEntity).ifPresent(list::add);
+      while (resultSet.next()) {
+        final Object targetEntityIdColumnValue;
+        if (targetEntityIdColumnName.equals(metaData.getColumnName(1))) {
+          targetEntityIdColumnValue = resultSet.getObject(1);
+        } else {
+          targetEntityIdColumnValue = resultSet.getObject(2);
         }
-      } else {
-        throw new InvalidResultSetException(
-            "Result set columns do not match related entities' id columns!"
-        );
+        findById(targetEntityIdColumnValue, targetEntity).ifPresent(list::add);
       }
     } catch (SQLException | InvalidResultSetException e) {
-      e.printStackTrace();
+      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
       return emptyList();
     }
     return list;
@@ -542,29 +554,29 @@ public interface AbstractJdbcPlusRepository {
    * @param metaData                  result set meta-data
    * @param currentEntityIdColumnName current entity id column name
    * @param targetEntityIdColumnName  target entity id column name
-   * @return TRUE if result set consists of 2 columns and
-   * each column has an association with the entity
+   *                                  each column has an association with the entity
    */
-  default boolean validManyToManyResultSet(
+  default void validateManyToManyResultSet(
       final ResultSetMetaData metaData,
       final String currentEntityIdColumnName,
       final String targetEntityIdColumnName
   ) {
+    boolean isValid;
     try {
-      return Objects.nonNull(metaData)
+      isValid = Objects.nonNull(metaData)
           && metaData.getColumnCount() == 2
-          && (
-          (
-              metaData.getColumnName(1).equals(currentEntityIdColumnName)
-                  && metaData.getColumnName(2).equals(targetEntityIdColumnName)
-          ) || (
-              metaData.getColumnName(2).equals(currentEntityIdColumnName)
-                  && metaData.getColumnName(1).equals(targetEntityIdColumnName)
-          )
-      );
+          && ((metaData.getColumnName(1).equals(currentEntityIdColumnName)
+          && metaData.getColumnName(2).equals(targetEntityIdColumnName))
+          || (metaData.getColumnName(2).equals(currentEntityIdColumnName)
+          && metaData.getColumnName(1).equals(targetEntityIdColumnName)));
     } catch (SQLException e) {
-      e.printStackTrace();
-      return false;
+      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
+      isValid = false;
+    }
+    if (!isValid) {
+      throw new InvalidResultSetException(
+          "Result set columns do not match related entities' id columns!"
+      );
     }
   }
 

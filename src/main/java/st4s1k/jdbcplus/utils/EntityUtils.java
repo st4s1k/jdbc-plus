@@ -149,49 +149,29 @@ public class EntityUtils {
     return getFieldsAnnotatedWith(ManyToOne.class, clazz);
   }
 
-  public static Field getManyToOneField(
+  public static Field getRelationalField(
       final Class<?> clazz,
-      final Class<?> targetEntity
+      final Class<?> targetEntity,
+      final Class<? extends Annotation> annotation
   ) {
-    final List<Field> manyToOneParentFields = Arrays.stream(getManyToOneFields(clazz))
-        .filter(field -> field.getType().equals(targetEntity))
+    final Field[] fields = getFieldsAnnotatedWith(annotation, clazz);
+    final List<Field> parentFields = Arrays.stream(fields)
+        .filter(field -> getObjectOrCollectionType(field).equals(targetEntity))
         .collect(toList());
-    if (manyToOneParentFields.isEmpty()) {
-      throw new InvalidMappingException(String.format(
-          "There should be at least one @%s field of type %s in class %s",
-          ManyToOne.class.getSimpleName(),
-          targetEntity.getName(),
-          clazz.getName()
-      ));
-    } else if (manyToOneParentFields.size() > 1) {
-      throw new InvalidMappingException(String.format(
-          "There should be only one @%s field of type %s in class %s",
-          ManyToOne.class.getSimpleName(),
-          targetEntity.getName(),
-          clazz.getName()
-      ));
+    if (parentFields.size() == 1) {
+      return parentFields.get(0);
     }
-    return manyToOneParentFields.get(0);
+    throw new InvalidMappingException(String.format(
+        "There should be exactly one @%s field of type %s in class %s, found %d",
+        annotation.getSimpleName(),
+        targetEntity.getName(),
+        clazz.getName(),
+        parentFields.size()
+    ));
   }
 
   public static Field[] getOneToManyFields(final Class<?> clazz) {
     return getFieldsAnnotatedWith(OneToMany.class, clazz);
-  }
-
-  public static Class<?> getTargetEntity(final Field field) {
-    if (field.isAnnotationPresent(OneToOne.class)) {
-      return getOneToOneTargetEntity(field);
-    } else if (field.isAnnotationPresent(ManyToOne.class)) {
-      return getManyToOneTargetEntity(field);
-    } else if (field.isAnnotationPresent(OneToMany.class)) {
-      return getOneToManyTargetEntity(field);
-    } else if (field.isAnnotationPresent(ManyToMany.class)) {
-      return getManyToManyTargetEntity(field);
-    }
-    throw new InvalidMappingException(String.format(
-        "Field %s does not contain any relation defining annotation",
-        field.getName()
-    ));
   }
 
   public static <A extends Annotation> Class<?> getTargetEntity(
@@ -210,6 +190,22 @@ public class EntityUtils {
         )));
   }
 
+  public static Class<?> getTargetEntity(final Field field) {
+    if (field.isAnnotationPresent(OneToOne.class)) {
+      return getTargetEntity(field, OneToOne.class, OneToOne::targetEntity);
+    } else if (field.isAnnotationPresent(ManyToOne.class)) {
+      return getTargetEntity(field, ManyToOne.class, ManyToOne::targetEntity);
+    } else if (field.isAnnotationPresent(OneToMany.class)) {
+      return getTargetEntity(field, OneToMany.class, OneToMany::targetEntity);
+    } else if (field.isAnnotationPresent(ManyToMany.class)) {
+      return getTargetEntity(field, ManyToMany.class, ManyToMany::targetEntity);
+    }
+    throw new InvalidMappingException(String.format(
+        "Field %s does not contain any relation defining annotation",
+        field.getName()
+    ));
+  }
+
   public static Class<?> getObjectOrCollectionType(final Field field) {
     final Class<?> fieldType = field.getType();
     if (Collection.class.isAssignableFrom(fieldType)) {
@@ -218,24 +214,25 @@ public class EntityUtils {
     return fieldType;
   }
 
-  public static Class<?> getOneToOneTargetEntity(final Field field) {
-    return getTargetEntity(field, OneToOne.class, OneToOne::targetEntity);
-  }
-
-  public static Class<?> getManyToOneTargetEntity(final Field field) {
-    return getTargetEntity(field, ManyToOne.class, ManyToOne::targetEntity);
-  }
-
-  public static Class<?> getOneToManyTargetEntity(final Field field) {
-    return getTargetEntity(field, OneToMany.class, OneToMany::targetEntity);
-  }
-
-  public static Class<?> getManyToManyTargetEntity(final Field field) {
-    return getTargetEntity(field, ManyToMany.class, ManyToMany::targetEntity);
+  public static JoinTable getJoinTable(final Field field) {
+    return field.getAnnotation(JoinTable.class);
   }
 
   public static String getJoinTableName(final Field field) {
     return field.getAnnotation(JoinTable.class).value();
+  }
+
+  public static String getJoinTableColumnName(final Class<?> entityClass) {
+    return String.format("%s_%s", getTableName(entityClass), getIdColumnName(entityClass));
+  }
+
+  public static String getEntityJoinColumnName(
+      final Class<?> clazz,
+      final JoinColumn joinColumn
+  ) {
+    return "".equals(joinColumn.value())
+        ? getJoinTableColumnName(clazz)
+        : joinColumn.value();
   }
 
   public static Field[] getManyToManyFields(final Class<?> clazz) {

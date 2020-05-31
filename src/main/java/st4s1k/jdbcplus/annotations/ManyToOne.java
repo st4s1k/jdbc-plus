@@ -8,5 +8,5 @@ import java.lang.annotation.Target;
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ManyToOne {
-    Class<?> targetEntity() default void.class;
+  Class<?> targetEntity() default void.class;
 }

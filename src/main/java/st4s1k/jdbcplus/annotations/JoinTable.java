@@ -8,5 +8,10 @@ import java.lang.annotation.Target;
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface JoinTable {
-    String value();
+
+  String value();
+
+  JoinColumn joinColumn() default @JoinColumn("");
+
+  JoinColumn inverseJoinColumn() default @JoinColumn("");
 }
