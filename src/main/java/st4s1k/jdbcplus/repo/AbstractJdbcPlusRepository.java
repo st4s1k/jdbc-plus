@@ -20,7 +20,7 @@ import static java.util.function.Predicate.not;
 import static st4s1k.jdbcplus.utils.EntityUtils.*;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.getClassInstance;
 
-public final class AbstractJdbcPlusRepository {
+public class AbstractJdbcPlusRepository {
 
   private final Logger logger;
 

@@ -8,12 +8,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public final class JdbcPlusRepository<T> {
+public class JdbcPlusRepository<T> {
 
   private final AbstractJdbcPlusRepository abstractJdbcPlusRepository;
+  private final Class<T> entityClass;
 
   public JdbcPlusRepository(final AbstractJdbcPlusRepository abstractJdbcPlusRepository) {
     this.abstractJdbcPlusRepository = abstractJdbcPlusRepository;
+    entityClass = (Class<T>) ((ParameterizedType) getClass()
+        .getGenericSuperclass()).getActualTypeArguments()[0];
   }
 
   /**
@@ -21,10 +24,8 @@ public final class JdbcPlusRepository<T> {
    *
    * @return the class of the entity
    */
-  @SuppressWarnings("unchecked")
   private Class<T> getEntityClass() {
-    return (Class<T>) ((ParameterizedType) this.getClass().getGenericSuperclass())
-        .getActualTypeArguments()[0];
+    return entityClass;
   }
 
   /**
