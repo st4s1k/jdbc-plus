@@ -13,6 +13,7 @@ public class JdbcPlusRepository<T> {
   private final AbstractJdbcPlusRepository abstractJdbcPlusRepository;
   private final Class<T> entityClass;
 
+  @SuppressWarnings("unchecked")
   public JdbcPlusRepository(final AbstractJdbcPlusRepository abstractJdbcPlusRepository) {
     this.abstractJdbcPlusRepository = abstractJdbcPlusRepository;
     entityClass = (Class<T>) ((ParameterizedType) getClass()
@@ -44,7 +45,7 @@ public class JdbcPlusRepository<T> {
    * @return {@link Optional} saved entity
    */
   public Optional<T> save(final T entity) {
-    return abstractJdbcPlusRepository.save(entity, getEntityClass());
+    return abstractJdbcPlusRepository.save(entity);
   }
 
   /**
@@ -54,7 +55,7 @@ public class JdbcPlusRepository<T> {
    * @return {@link Optional} updated entity
    */
   public Optional<T> update(final T entity) {
-    return abstractJdbcPlusRepository.update(entity, getEntityClass());
+    return abstractJdbcPlusRepository.update(entity);
   }
 
   /**
@@ -64,7 +65,7 @@ public class JdbcPlusRepository<T> {
    * @return {@link Optional} removed entity
    */
   public Optional<T> remove(final T entity) {
-    return abstractJdbcPlusRepository.remove(entity, getEntityClass());
+    return abstractJdbcPlusRepository.remove(entity);
   }
 
   /**
@@ -74,7 +75,7 @@ public class JdbcPlusRepository<T> {
    * @return a list of found entities
    */
   public List<T> find(final T entity) {
-    return abstractJdbcPlusRepository.find(entity, getEntityClass());
+    return abstractJdbcPlusRepository.find(entity);
   }
 
   /**

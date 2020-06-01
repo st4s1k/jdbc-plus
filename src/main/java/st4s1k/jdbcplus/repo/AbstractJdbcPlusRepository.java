@@ -39,16 +39,19 @@ public class AbstractJdbcPlusRepository {
     this.databaseConnection = databaseConnection;
   }
 
+  @SuppressWarnings("unchecked")
+  public <X> Class<X> getGenerifiedClass(final X entity) {
+    return (Class<X>) entity.getClass();
+  }
+
   /**
    * Generates REMOVE sql query for an entity.
    *
    * @param entity the entity
    * @return SQL query string
    */
-  public <X> String sqlRemove(
-      final X entity,
-      final Class<X> clazz
-  ) {
+  public <X> String sqlRemove(final X entity) {
+    final Class<?> clazz = entity.getClass();
     final String table = getTableName(clazz);
     final String id = getIdColumnName(clazz);
     final Object idColumnValue = getIdColumnValue(entity);
@@ -62,14 +65,12 @@ public class AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return SQL query string
    */
-  public <X> String sqlInsert(
-      final X entity,
-      final Class<X> clazz
-  ) {
+  public <X> String sqlInsert(final X entity) {
+    final Class<?> clazz = entity.getClass();
     final String table = getTableName(clazz);
     final StringBuilder columns = new StringBuilder();
     final StringBuilder values = new StringBuilder();
-    final String[] fieldNames = getColumnNames(entity.getClass());
+    final String[] fieldNames = getColumnNames(clazz);
     final String[] fieldValues = getColumnValuesAsStringForSQL(entity, clazz);
     for (int i = 0; i < fieldNames.length; i++) {
       if (Optional.ofNullable(fieldValues[i]).isPresent()) {
@@ -90,10 +91,8 @@ public class AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return SQL query string
    */
-  public <X> String sqlUpdate(
-      final X entity,
-      final Class<X> clazz
-  ) {
+  public <X> String sqlUpdate(final X entity) {
+    final Class<?> clazz = entity.getClass();
     final String table = getTableName(clazz);
     final String idColumnName = getIdColumnName(clazz);
     final Object idValue = getIdColumnValue(entity);
@@ -184,13 +183,11 @@ public class AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return {@link Optional} saved entity
    */
-  public <X> Optional<X> save(
-      final X entity,
-      final Class<X> clazz
-  ) {
+  public <X> Optional<X> save(final X entity) {
+    final Class<X> aClass = getGenerifiedClass(entity);
     return databaseConnection.queryTransaction(
-        sqlInsert(entity, clazz),
-        resultSet -> Optional.ofNullable(getObject(resultSet, clazz)),
+        sqlInsert(entity),
+        resultSet -> Optional.ofNullable(getObject(resultSet, aClass)),
         Optional::empty
     );
   }
@@ -201,13 +198,11 @@ public class AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return {@link Optional} updated entity
    */
-  public <X> Optional<X> update(
-      final X entity,
-      final Class<X> clazz
-  ) {
+  public <X> Optional<X> update(final X entity) {
+    final Class<X> clazz = getGenerifiedClass(entity);
     return findById(getIdColumnValue(entity), clazz)
         .flatMap(e -> databaseConnection.queryTransaction(
-            sqlUpdate(e, clazz),
+            sqlUpdate(e),
             resultSet -> getObject(resultSet, clazz)
         ));
   }
@@ -218,13 +213,11 @@ public class AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return {@link Optional} removed entity
    */
-  public <X> Optional<X> remove(
-      final X entity,
-      final Class<X> clazz
-  ) {
+  public <X> Optional<X> remove(final X entity) {
+    final Class<X> clazz = getGenerifiedClass(entity);
     return findById(getIdColumnValue(entity), clazz)
         .flatMap(e -> databaseConnection.queryTransaction(
-            sqlRemove(e, clazz),
+            sqlRemove(e),
             resultSet -> getObject(resultSet, clazz)
         ));
   }
@@ -235,18 +228,15 @@ public class AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return a list of found entities
    */
-  public <X> List<X> find(
-      final X entity,
-      final Class<X> clazz
-  ) {
+  public <X> List<X> find(final X entity) {
     return Optional.ofNullable(entity)
         .map(e -> databaseConnection.queryTransaction(
             sqlSelectAllByColumns(
-                getTableName(clazz),
-                getColumnNames(clazz),
-                getColumnValues(entity, clazz)
+                getTableName(getGenerifiedClass(entity)),
+                getColumnNames(getGenerifiedClass(entity)),
+                getColumnValues(entity, getGenerifiedClass(entity))
             ),
-            resultSet -> getObjects(resultSet, clazz),
+            resultSet -> getObjects(resultSet, getGenerifiedClass(entity)),
             Collections::<X>emptyList
         ))
         .orElse(emptyList());
@@ -446,10 +436,8 @@ public class AbstractJdbcPlusRepository {
    *
    * @param entity the entity
    */
-  public <X> void populateOneToManyFields(
-      final X entity,
-      final Class<X> clazz
-  ) {
+  public <X> void populateOneToManyFields(final X entity) {
+    final Class<X> clazz = getGenerifiedClass(entity);
     for (Field field : getOneToManyFields(clazz)) {
       populateOneToManyField(field, entity, clazz);
     }
@@ -458,23 +446,22 @@ public class AbstractJdbcPlusRepository {
   /**
    * Populate one {@link ManyToMany} field.
    *
+   * @param <X>    entity type
    * @param field  field that contains @OneToMany|@ManyToMany annotation
    *               and returns a table name
    * @param entity the entity
-   * @param clazz  entity class
-   * @param <X>    entity type
    */
   public <X> void populateManyToManyField(
       final Field field,
-      final X entity,
-      final Class<X> clazz
+      final X entity
   ) {
     if (Collection.class.isAssignableFrom(field.getType())) {
       final Class<?> targetEntity = getTargetEntity(field);
       final JoinTable joinTable = getJoinTable(field, targetEntity);
       final JoinColumn joinColumn = joinTable.joinColumn();
       final JoinColumn inverseJoinColumn = joinTable.inverseJoinColumn();
-      final String currentEntityIdColumnName = getEntityJoinColumnName(clazz, joinColumn);
+      final Class<X> entityClass = getGenerifiedClass(entity);
+      final String currentEntityIdColumnName = getEntityJoinColumnName(entityClass, joinColumn);
       final String targetEntityIdColumnName = getEntityJoinColumnName(
           targetEntity,
           inverseJoinColumn
@@ -548,12 +535,10 @@ public class AbstractJdbcPlusRepository {
    *
    * @param entity the entity
    */
-  public <X> void populateManyToManyFields(
-      final X entity,
-      final Class<X> clazz
-  ) {
+  public <X> void populateManyToManyFields(final X entity) {
+    final Class<X> clazz = getGenerifiedClass(entity);
     for (Field field : getManyToManyFields(clazz)) {
-      populateManyToManyField(field, entity, clazz);
+      populateManyToManyField(field, entity);
     }
   }
 }

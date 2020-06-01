@@ -39,25 +39,25 @@ class JdbcPlusRepositoryTest {
   @Test
   void testSave() {
     jdbcPlusRepository.save(entity);
-    verify(abstractJdbcPlusRepository).save(entity, Entity.class);
+    verify(abstractJdbcPlusRepository).save(entity);
   }
 
   @Test
   void testUpdate() {
     jdbcPlusRepository.update(entity);
-    verify(abstractJdbcPlusRepository).update(entity, Entity.class);
+    verify(abstractJdbcPlusRepository).update(entity);
   }
 
   @Test
   void testRemove() {
     jdbcPlusRepository.remove(entity);
-    verify(abstractJdbcPlusRepository).remove(entity, Entity.class);
+    verify(abstractJdbcPlusRepository).remove(entity);
   }
 
   @Test
   void testFind() {
     jdbcPlusRepository.find(entity);
-    verify(abstractJdbcPlusRepository).find(entity, Entity.class);
+    verify(abstractJdbcPlusRepository).find(entity);
   }
 
   @Test

@@ -54,7 +54,7 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testSqlRemove() {
-    final var result = abstractJdbcPlusRepository.sqlRemove(entity, Entity.class);
+    final var result = abstractJdbcPlusRepository.sqlRemove(entity);
     final var expectedStringTemplate = "delete from %s where id = %d returning *";
     assertThat(result).isEqualTo(
         expectedStringTemplate,
@@ -65,7 +65,7 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testSqlInsert() {
-    final var result = abstractJdbcPlusRepository.sqlInsert(entity, Entity.class);
+    final var result = abstractJdbcPlusRepository.sqlInsert(entity);
     final var expectedStringTemplate =
         "insert into %s(id, name, rank) values (%d, '%s', %d) returning *";
     assertThat(result).isEqualTo(
@@ -79,7 +79,7 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testSqlUpdate() {
-    final var result = abstractJdbcPlusRepository.sqlUpdate(entity, Entity.class);
+    final var result = abstractJdbcPlusRepository.sqlUpdate(entity);
     final var expectedStringTemplate =
         "update %s set name = '%s', rank = %d where id = %d returning *";
     assertThat(result).isEqualTo(
@@ -174,8 +174,8 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testSave() {
-    abstractJdbcPlusRepository.save(entity, Entity.class);
-    final var expectedQuery = abstractJdbcPlusRepository.sqlInsert(entity, Entity.class);
+    abstractJdbcPlusRepository.save(entity);
+    final var expectedQuery = abstractJdbcPlusRepository.sqlInsert(entity);
     verify(databaseConnection).queryTransaction(eq(expectedQuery), any(), any());
   }
 
@@ -186,12 +186,12 @@ class AbstractJdbcPlusRepositoryTest {
         "id",
         entity.getId()
     );
-    final var expectedQuery = abstractJdbcPlusRepository.sqlUpdate(entity, Entity.class);
+    final var expectedQuery = abstractJdbcPlusRepository.sqlUpdate(entity);
     when(databaseConnection.queryTransaction(eq(selectQuery), any(), any()))
         .thenReturn(List.of(entity));
     when(databaseConnection.queryTransaction(eq(expectedQuery), any()))
         .thenReturn(Optional.of(entity));
-    abstractJdbcPlusRepository.update(entity, Entity.class);
+    abstractJdbcPlusRepository.update(entity);
     verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());
     verify(databaseConnection).queryTransaction(eq(expectedQuery), any());
   }
@@ -203,19 +203,19 @@ class AbstractJdbcPlusRepositoryTest {
         "id",
         entity.getId()
     );
-    final var expectedQuery = abstractJdbcPlusRepository.sqlRemove(entity, Entity.class);
+    final var expectedQuery = abstractJdbcPlusRepository.sqlRemove(entity);
     when(databaseConnection.queryTransaction(eq(selectQuery), any(), any()))
         .thenReturn(List.of(entity));
     when(databaseConnection.queryTransaction(eq(expectedQuery), any()))
         .thenReturn(Optional.of(entity));
-    abstractJdbcPlusRepository.remove(entity, Entity.class);
+    abstractJdbcPlusRepository.remove(entity);
     verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());
     verify(databaseConnection).queryTransaction(eq(expectedQuery), any());
   }
 
   @Test
   void testFind() {
-    abstractJdbcPlusRepository.find(entity, Entity.class);
+    abstractJdbcPlusRepository.find(entity);
     final var expectedQuery = abstractJdbcPlusRepository.sqlSelectAllByColumns(
         getTableName(entity.getClass()),
         getColumnNames(Entity.class),
@@ -333,7 +333,7 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testPopulateOneToManyFields() {
-    abstractJdbcPlusRepository.populateOneToManyFields(entity, Entity.class);
+    abstractJdbcPlusRepository.populateOneToManyFields(entity);
     final var numberOfFields = getOneToManyFields(Entity.class).length;
     verify(databaseConnection, times(numberOfFields)).queryTransaction(any(), any(), any());
   }
@@ -351,13 +351,13 @@ class AbstractJdbcPlusRepositoryTest {
     final var newEntity3 = getEntity3(40, "SomeEntity4", 9);
     when(databaseConnection.queryTransaction(eq(query), any(), any()))
         .thenReturn(List.of(newEntity3));
-    abstractJdbcPlusRepository.populateManyToManyField(field, entity1, Entity1.class);
+    abstractJdbcPlusRepository.populateManyToManyField(field, entity1);
     assertThat(entity1.getEntity3s()).containsOnly(newEntity3);
   }
 
   @Test
   void testPopulateManyToManyFields() {
-    abstractJdbcPlusRepository.populateManyToManyFields(entity1, Entity1.class);
+    abstractJdbcPlusRepository.populateManyToManyFields(entity1);
     final var numberOfFields = getManyToManyFields(Entity1.class).length;
     verify(databaseConnection, times(numberOfFields)).queryTransaction(any(), any(), any());
   }
