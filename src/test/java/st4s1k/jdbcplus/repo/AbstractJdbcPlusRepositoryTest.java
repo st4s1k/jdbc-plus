@@ -346,7 +346,7 @@ class AbstractJdbcPlusRepositoryTest {
     final var query = abstractJdbcPlusRepository.sqlSelectAllByColumn(
         getJoinTableName(field),
         getEntityJoinColumnName(Entity1.class, joinColumn),
-        getIdColumnValue(entity1, Entity1.class)
+        getIdColumnValue(entity1)
     );
     final var newEntity3 = getEntity3(40, "SomeEntity4", 9);
     when(databaseConnection.queryTransaction(eq(query), any(), any()))

@@ -139,11 +139,12 @@ public class EntityUtils {
   }
 
   public static String getJoinColumnName(final Field field) {
-    requireNonNull(field);
     if (field.isAnnotationPresent(JoinColumn.class)) {
       return getAnnotation(field, JoinColumn.class).value();
     }
-    return null;
+    throw new MissingAnnotationException(String.format(
+        "Annotation @JoinColumn is missing on field %s", field.getName()
+    ));
   }
 
   public static Map<String, Field> getColumnsMap(final Class<?> clazz) {
@@ -330,12 +331,9 @@ public class EntityUtils {
         .toArray(String[]::new);
   }
 
-  public static <T> Object getIdColumnValue(
-      final T entity,
-      final Class<?> clazz
-  ) {
+  public static <T> Object getIdColumnValue(final T entity) {
     try {
-      final Field idColumn = getIdColumn(clazz);
+      final Field idColumn = getIdColumn(entity.getClass());
       idColumn.setAccessible(true);
       return idColumn.get(entity);
     } catch (IllegalAccessException e) {

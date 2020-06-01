@@ -51,7 +51,7 @@ public class AbstractJdbcPlusRepository {
   ) {
     final String table = getTableName(clazz);
     final String id = getIdColumnName(clazz);
-    final Object idColumnValue = getIdColumnValue(entity, clazz);
+    final Object idColumnValue = getIdColumnValue(entity);
     final String value = getStringValueForSQL(idColumnValue);
     return String.format("delete from %s where %s = %s returning *", table, id, value);
   }
@@ -96,7 +96,7 @@ public class AbstractJdbcPlusRepository {
   ) {
     final String table = getTableName(clazz);
     final String idColumnName = getIdColumnName(clazz);
-    final Object idValue = getIdColumnValue(entity, clazz);
+    final Object idValue = getIdColumnValue(entity);
     final String idStringValue = getStringValueForSQL(idValue);
     final String[] fieldNames = getColumnNames(clazz);
     final String[] fieldValues = getColumnValuesAsStringForSQL(entity, clazz);
@@ -188,12 +188,11 @@ public class AbstractJdbcPlusRepository {
       final X entity,
       final Class<X> clazz
   ) {
-    return databaseConnection
-        .queryTransaction(
-            sqlInsert(entity, clazz),
-            resultSet -> Optional.ofNullable(getObject(resultSet, clazz)),
-            Optional::empty
-        );
+    return databaseConnection.queryTransaction(
+        sqlInsert(entity, clazz),
+        resultSet -> Optional.ofNullable(getObject(resultSet, clazz)),
+        Optional::empty
+    );
   }
 
   /**
@@ -206,7 +205,7 @@ public class AbstractJdbcPlusRepository {
       final X entity,
       final Class<X> clazz
   ) {
-    return findById(getIdColumnValue(entity, clazz), clazz)
+    return findById(getIdColumnValue(entity), clazz)
         .flatMap(e -> databaseConnection.queryTransaction(
             sqlUpdate(e, clazz),
             resultSet -> getObject(resultSet, clazz)
@@ -223,7 +222,7 @@ public class AbstractJdbcPlusRepository {
       final X entity,
       final Class<X> clazz
   ) {
-    return findById(getIdColumnValue(entity, clazz), clazz)
+    return findById(getIdColumnValue(entity), clazz)
         .flatMap(e -> databaseConnection.queryTransaction(
             sqlRemove(e, clazz),
             resultSet -> getObject(resultSet, clazz)
@@ -241,16 +240,15 @@ public class AbstractJdbcPlusRepository {
       final Class<X> clazz
   ) {
     return Optional.ofNullable(entity)
-        .map(e -> databaseConnection
-            .queryTransaction(
-                sqlSelectAllByColumns(
-                    getTableName(clazz),
-                    getColumnNames(clazz),
-                    getColumnValues(entity, clazz)
-                ),
-                resultSet -> getObjects(resultSet, clazz),
-                Collections::<X>emptyList
-            ))
+        .map(e -> databaseConnection.queryTransaction(
+            sqlSelectAllByColumns(
+                getTableName(clazz),
+                getColumnNames(clazz),
+                getColumnValues(entity, clazz)
+            ),
+            resultSet -> getObjects(resultSet, clazz),
+            Collections::<X>emptyList
+        ))
         .orElse(emptyList());
   }
 
@@ -260,12 +258,11 @@ public class AbstractJdbcPlusRepository {
    * @return a list of found entities
    */
   public <X> List<X> findAll(final Class<X> clazz) {
-    return databaseConnection
-        .queryTransaction(
-            sqlSelectAll(getTableName(clazz)),
-            resultSet -> getObjects(resultSet, clazz),
-            Collections::emptyList
-        );
+    return databaseConnection.queryTransaction(
+        sqlSelectAll(getTableName(clazz)),
+        resultSet -> getObjects(resultSet, clazz),
+        Collections::emptyList
+    );
   }
 
   /**
@@ -282,16 +279,15 @@ public class AbstractJdbcPlusRepository {
       final Class<X> clazz
   ) {
     return Optional.ofNullable(column)
-        .map(field -> databaseConnection
-            .queryTransaction(
-                sqlSelectAllByColumn(
-                    getTableName(clazz),
-                    field,
-                    value
-                ),
-                resultSet -> getObjects(resultSet, clazz),
-                Collections::<X>emptyList
-            ))
+        .map(field -> databaseConnection.queryTransaction(
+            sqlSelectAllByColumn(
+                getTableName(clazz),
+                field,
+                value
+            ),
+            resultSet -> getObjects(resultSet, clazz),
+            Collections::<X>emptyList
+        ))
         .orElse(emptyList());
   }
 
@@ -411,7 +407,7 @@ public class AbstractJdbcPlusRepository {
     final String targetEntityTableName = getTableName(targetEntity);
     final Field manyToOneField = getRelationalField(targetEntity, clazz, ManyToOne.class);
     final String targetEntityManyToOneColumnName = getColumnName(manyToOneField);
-    final Object currentEntityIdColumnValue = getIdColumnValue(entity, clazz);
+    final Object currentEntityIdColumnValue = getIdColumnValue(entity);
     final String query = sqlSelectAllByColumn(
         targetEntityTableName,
         targetEntityManyToOneColumnName,
@@ -432,12 +428,11 @@ public class AbstractJdbcPlusRepository {
       final Function<ResultSet, R> resultSetFunction,
       final Supplier<R> defaultResult
   ) {
-    final R result = databaseConnection
-        .queryTransaction(
-            query,
-            resultSetFunction,
-            defaultResult
-        );
+    final R result = databaseConnection.queryTransaction(
+        query,
+        resultSetFunction,
+        defaultResult
+    );
     field.setAccessible(true);
     try {
       field.set(entity, result);
@@ -487,7 +482,7 @@ public class AbstractJdbcPlusRepository {
       final String query = sqlSelectAllByColumn(
           joinTable.value(),
           currentEntityIdColumnName,
-          getIdColumnValue(entity, clazz)
+          getIdColumnValue(entity)
       );
       populateField(
           field, entity, query,
