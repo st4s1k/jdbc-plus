@@ -55,7 +55,7 @@ public class AbstractJdbcPlusRepository {
     final String table = getTableName(clazz);
     final String id = getIdColumnName(clazz);
     final Object idColumnValue = getIdColumnValue(entity);
-    final String value = getStringValueForSQL(idColumnValue);
+    final String value = getStringValueForSql(idColumnValue);
     return String.format("delete from %s where %s = %s returning *", table, id, value);
   }
 
@@ -96,7 +96,7 @@ public class AbstractJdbcPlusRepository {
     final String table = getTableName(clazz);
     final String idColumnName = getIdColumnName(clazz);
     final Object idValue = getIdColumnValue(entity);
-    final String idStringValue = getStringValueForSQL(idValue);
+    final String idStringValue = getStringValueForSql(idValue);
     final String[] fieldNames = getColumnNames(clazz);
     final String[] fieldValues = getColumnValuesAsStringForSQL(entity, clazz);
     final StringBuilder columns = new StringBuilder();
@@ -169,7 +169,7 @@ public class AbstractJdbcPlusRepository {
           conditions.append(", ");
         }
         final String column = columns[i];
-        final String value = getStringValueForSQL(values[i]);
+        final String value = getStringValueForSql(values[i]);
         conditions.append(column).append(" = ").append(value);
       }
       return sqlSelectAll(table) + " where " + conditions;
@@ -359,7 +359,22 @@ public class AbstractJdbcPlusRepository {
         if (columnsMap.containsKey(columnName)) {
           final Field column = columnsMap.get(columnName);
           column.setAccessible(true);
-          column.set(entity, resultSet.getObject(columnIndex, column.getType()));
+          final Class<?> columnType = column.getType();
+          if (columnType.isAnnotationPresent(Table.class)) {
+            final Class<?> relatedObjectClass = getTargetEntity(column);
+            final Field relatedObjectIdColumn = getIdColumn(relatedObjectClass);
+            final Class<?> relatedObjectIdType = relatedObjectIdColumn.getType();
+            final Object relatedObjectId = resultSet.getObject(columnIndex, relatedObjectIdType);
+            final Object relatedObject = findById(relatedObjectId, relatedObjectClass)
+                .orElseThrow(() -> new InvalidResultSetException(String.format(
+                    "Cannot find entity of type: %s, with given id: %s",
+                    relatedObjectClass.getSimpleName(),
+                    relatedObjectId
+                )));
+            column.set(entity, relatedObject);
+          } else {
+            column.set(entity, resultSet.getObject(columnIndex, columnType));
+          }
         }
       }
     } catch (SQLException | IllegalAccessException e) {
@@ -457,7 +472,7 @@ public class AbstractJdbcPlusRepository {
   ) {
     if (Collection.class.isAssignableFrom(field.getType())) {
       final Class<?> targetEntity = getTargetEntity(field);
-      final JoinTable joinTable = getJoinTable(field, targetEntity);
+      final JoinTable joinTable = getJoinTable(field);
       final JoinColumn joinColumn = joinTable.joinColumn();
       final JoinColumn inverseJoinColumn = joinTable.inverseJoinColumn();
       final Class<X> entityClass = getGenerifiedClass(entity);

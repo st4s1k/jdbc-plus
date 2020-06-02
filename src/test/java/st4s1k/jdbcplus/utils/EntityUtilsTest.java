@@ -22,11 +22,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static st4s1k.jdbcplus.repo.TestUtils.getEntities;
 import static st4s1k.jdbcplus.repo.TestUtils.getEntity;
 import static st4s1k.jdbcplus.utils.EntityUtils.*;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.concatenateArrays;
@@ -34,7 +34,7 @@ import static st4s1k.jdbcplus.utils.JdbcPlusUtils.concatenateArrays;
 @ExtendWith(MockitoExtension.class)
 class EntityUtilsTest {
 
-  private List<Entity> entities;
+  private final List<Entity> entities = getEntities(100, 5);
 
   @BeforeEach
   void setUp() {
@@ -219,16 +219,31 @@ class EntityUtilsTest {
   }
 
   @Test
-  @Disabled
   void testGetOneToOneFields() {
-    final var oneToOneFields = getOneToOneFields(Entity.class);
+    final var actualOneToOneFields = getOneToOneFields(Entity.class);
+    final var expectedOneToOneFields = getFieldsAnnotatedWith(OneToOne.class, Entity.class);
+    assertThat(actualOneToOneFields).containsExactly(expectedOneToOneFields);
+  }
+
+  @Test
+  void testGetOneToManyFields() {
+    final var actualOneToManyFields = getOneToManyFields(Entity.class);
+    final var expectedManyToOneFields = getFieldsAnnotatedWith(OneToMany.class, Entity.class);
+    assertThat(actualOneToManyFields).containsExactly(expectedManyToOneFields);
   }
 
   @Test
   void testGetManyToOneFields() {
-    final var actualManyToOneFields = getManyToOneFields(Entity.class);
-    final var expectedManyToOneFields = getFieldsAnnotatedWith(ManyToOne.class, Entity.class);
+    final var actualManyToOneFields = getManyToOneFields(Entity2.class);
+    final var expectedManyToOneFields = getFieldsAnnotatedWith(ManyToOne.class, Entity2.class);
     assertThat(actualManyToOneFields).containsExactly(expectedManyToOneFields);
+  }
+
+  @Test
+  void testGetManyToManyFields() {
+    final var actualManyToManyFields = getManyToManyFields(Entity1.class);
+    final var expectedManyToManyFields = getFieldsAnnotatedWith(ManyToMany.class, Entity1.class);
+    assertThat(actualManyToManyFields).containsExactly(expectedManyToManyFields);
   }
 
   @Test
@@ -240,12 +255,6 @@ class EntityUtilsTest {
     );
     final var expectedRelationalField = Entity.class.getDeclaredField("entity2s");
     assertThat(actualRelationalField).isEqualTo(expectedRelationalField);
-  }
-
-  @Test
-  @Disabled
-  void testGetOneToManyFields() {
-
   }
 
   @Test
@@ -350,16 +359,50 @@ class EntityUtilsTest {
     );
   }
 
-  @Test
-  @Disabled
-  void testGetAnnotation() {
-
+  @ParameterizedTest
+  @MethodSource("paramsForGetAnnotation")
+  <A extends Annotation> void testGetAnnotation(
+      final Field field,
+      final Class<A> annotationClass
+  ) {
+    final var actualAnnotation = getAnnotation(field, annotationClass);
+    final var expectedAnnotation = field.getAnnotation(annotationClass);
+    assertThat(actualAnnotation).isEqualTo(expectedAnnotation);
   }
 
-  @Test
-  @Disabled
-  void testGetJoinTable() {
+  private static Stream<Arguments> paramsForGetAnnotation() throws NoSuchFieldException {
+    return Stream.of(
+        arguments(Entity.class.getDeclaredField("id"), Id.class),
+        arguments(Entity.class.getDeclaredField("rank"), Column.class),
+        arguments(Entity.class.getDeclaredField("entity1s"), OneToMany.class),
+        arguments(Entity.class.getDeclaredField("entity4"), OneToOne.class),
+        arguments(Entity1.class.getDeclaredField("entity"), ManyToOne.class),
+        arguments(Entity1.class.getDeclaredField("entity"), JoinColumn.class),
+        arguments(Entity1.class.getDeclaredField("entity2s"), ManyToMany.class),
+        arguments(Entity1.class.getDeclaredField("entity2s"), JoinTable.class)
+    );
+  }
 
+  @ParameterizedTest
+  @MethodSource("paramsForGetJoinTable")
+  void testGetJoinTable(
+      final Field manyToManyField,
+      final Field expectedFieldHavingJoinTable
+  ) {
+    final var actualJoinTable = getJoinTable(manyToManyField);
+    final var expectedJoinTable = getAnnotation(expectedFieldHavingJoinTable, JoinTable.class);
+    assertThat(actualJoinTable).isEqualTo(expectedJoinTable);
+  }
+
+  private static Stream<Arguments> paramsForGetJoinTable() throws NoSuchFieldException {
+    final var entity3s = Entity1.class.getDeclaredField("entity3s");
+    final var entity2s = Entity1.class.getDeclaredField("entity2s");
+    final var entity1s = Entity3.class.getDeclaredField("entity1s");
+    return Stream.of(
+        arguments(entity3s, entity3s),
+        arguments(entity2s, entity2s),
+        arguments(entity1s, entity3s)
+    );
   }
 
   @Test
@@ -377,12 +420,6 @@ class EntityUtilsTest {
   @Test
   @Disabled
   void testGetEntityJoinColumnName() {
-
-  }
-
-  @Test
-  @Disabled
-  void testGetManyToManyFields() {
 
   }
 
@@ -411,30 +448,20 @@ class EntityUtilsTest {
   }
 
   @Test
-  @Disabled
   void testGetIdColumnValue() {
-    final var entity = getEntity(
-        1, "SomeEntity", 5,
-        emptyList(), emptyList()
-    );
-    final Object actualIdColumnValue = getIdColumnValue(entity);
+    final var entity = getEntity(1, "SomeEntity", 5);
+    final var actualIdColumnValue = getIdColumnValue(entity);
     assertThat(actualIdColumnValue).isEqualTo(entity.getId());
   }
 
-  @Test
-  @Disabled
-  void testGetStringValueForSQL() {
-
-  }
-
   @ParameterizedTest
-  @MethodSource("parametersForGetStringValueForSql")
+  @MethodSource("paramsForGetStringValueForSql")
   void testGetStringValueForSql(final Object value, final String expectedValue) {
-    final var stringValue = getStringValueForSQL(value);
+    final var stringValue = getStringValueForSql(value);
     assertThat(stringValue).isEqualTo(expectedValue);
   }
 
-  private static Stream<Arguments> parametersForGetStringValueForSql() {
+  private static Stream<Arguments> paramsForGetStringValueForSql() {
     return Stream.of(
         arguments(1, "1"),
         arguments('a', "'a'"),
@@ -445,15 +472,16 @@ class EntityUtilsTest {
   }
 
   @ParameterizedTest
-  @MethodSource("parametersGetStringValueForSqlWhenInvalidTypeThenThrow")
+  @MethodSource("paramsForGetStringValueForSqlWhenInvalidTypeThenThrow")
   void testGetStringValueForSqlWhenInvalidTypeThenThrow(final Object value) {
     assertThrows(
         InvalidColumnTypeException.class,
-        () -> getStringValueForSQL(value)
+        () -> getStringValueForSql(value)
     );
   }
 
-  private static Stream<Arguments> parametersGetStringValueForSqlWhenInvalidTypeThenThrow() {
+  @SuppressWarnings("PrimitiveArrayArgumentToVarargsMethod")
+  private static Stream<Arguments> paramsForGetStringValueForSqlWhenInvalidTypeThenThrow() {
     return Stream.of(
         arguments(new long[]{1, 2, 3}),
         arguments(new int[]{1, 2, 3}),

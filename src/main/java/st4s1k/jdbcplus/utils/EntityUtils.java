@@ -10,7 +10,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 import static java.lang.System.Logger.Level.ERROR;
 import static java.util.Objects.requireNonNull;
@@ -99,11 +99,7 @@ public class EntityUtils {
           ? getAnnotation(field, Column.class).value()
           : toSnakeLowerCase(field.getName());
     } else {
-      throw new MissingAnnotationException(String.format(
-          "Missing @Id annotation on this field (%s %s)",
-          field.getType().getName(),
-          field.getName()
-      ));
+      throw new MissingAnnotationException(field, Id.class);
     }
   }
 
@@ -142,9 +138,7 @@ public class EntityUtils {
     if (field.isAnnotationPresent(JoinColumn.class)) {
       return getAnnotation(field, JoinColumn.class).value();
     }
-    throw new MissingAnnotationException(String.format(
-        "Annotation @JoinColumn is missing on field %s", field.getName()
-    ));
+    throw new MissingAnnotationException(field, JoinColumn.class);
   }
 
   public static Map<String, Field> getColumnsMap(final Class<?> clazz) {
@@ -236,14 +230,12 @@ public class EntityUtils {
         )));
   }
 
-  public static JoinTable getJoinTable(
-      final Field manyToManyField,
-      final Class<?> targetEntity
-  ) {
+  public static JoinTable getJoinTable(final Field manyToManyField) {
     final String mappedBy = getAnnotation(manyToManyField, ManyToMany.class).mappedBy();
-    if ("".equals(mappedBy)) {
+    if (mappedBy.isEmpty()) {
       return getAnnotation(manyToManyField, JoinTable.class);
     } else {
+      final Class<?> targetEntity = getTargetEntity(manyToManyField);
       final Field mappedByField = getField(targetEntity, mappedBy);
       return getAnnotation(mappedByField, JoinTable.class);
     }
@@ -261,7 +253,7 @@ public class EntityUtils {
       final Class<?> clazz,
       final JoinColumn joinColumn
   ) {
-    return "".equals(joinColumn.value())
+    return joinColumn.value().isEmpty()
         ? getJoinTableColumnName(clazz)
         : joinColumn.value();
   }
@@ -280,6 +272,7 @@ public class EntityUtils {
     return fields;
   }
 
+  // TODO: Implement *ToMany fields' population on select
   public static Field[] getToManyFields(final Class<?> clazz) {
     return concatenateArrays(
         Field.class,
@@ -288,28 +281,34 @@ public class EntityUtils {
     );
   }
 
+  private static <T> Object getColumnValueOrId(final Field field, final T entity) {
+    final Object columnValue = getColumnValue(field, entity);
+    return requireNonNull(columnValue).getClass().isAnnotationPresent(Table.class)
+        ? getIdColumnValue(columnValue)
+        : columnValue;
+  }
+
   public static <T> Object getColumnValue(
       final Field field,
       final T entity
   ) {
-    final Predicate<Field> hasColumnAnnotation = f -> f.isAnnotationPresent(Column.class);
-    final Predicate<Field> hasIdAnnotation = f -> f.isAnnotationPresent(Id.class);
-    final Predicate<Field> hasJoinColumnAnnotation = f -> f.isAnnotationPresent(JoinColumn.class);
-    final Predicate<Field> isColumn = hasColumnAnnotation
-        .or(hasJoinColumnAnnotation)
-        .or(hasIdAnnotation);
-    return Optional.ofNullable(field)
-        .filter(isColumn)
-        .map(column -> {
-          try {
-            column.setAccessible(true);
-            return column.get(entity);
-          } catch (IllegalAccessException e) {
-            LOGGER.log(ERROR, e.getLocalizedMessage(), e);
-            return null;
-          }
-        })
-        .orElse(null);
+    if (Stream.of(Column.class, JoinColumn.class, Id.class)
+        .anyMatch(field::isAnnotationPresent)) {
+      try {
+        field.setAccessible(true);
+        return field.get(entity);
+      } catch (IllegalAccessException e) {
+        LOGGER.log(ERROR, e.getLocalizedMessage(), e);
+        return null;
+      }
+    } else {
+      throw new MissingAnnotationException(
+          field,
+          Column.class,
+          JoinColumn.class,
+          Id.class
+      );
+    }
   }
 
   public static <T> Object[] getColumnValues(
@@ -326,8 +325,8 @@ public class EntityUtils {
       final Class<?> clazz
   ) {
     return Arrays.stream(getColumns(clazz))
-        .map(f -> getColumnValue(f, entity))
-        .map(EntityUtils::getStringValueForSQL)
+        .map(f -> getColumnValueOrId(f, entity))
+        .map(EntityUtils::getStringValueForSql)
         .toArray(String[]::new);
   }
 
@@ -347,7 +346,7 @@ public class EntityUtils {
    *
    * @return string value
    */
-  public static String getStringValueForSQL(final Object value) {
+  public static String getStringValueForSql(final Object value) {
     if (value == null) {
       return "NULL";
     } else if (!value.getClass().isArray()) {

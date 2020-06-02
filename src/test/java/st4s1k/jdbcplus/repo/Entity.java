@@ -1,14 +1,13 @@
 package st4s1k.jdbcplus.repo;
 
 import lombok.Data;
-import st4s1k.jdbcplus.annotations.Column;
-import st4s1k.jdbcplus.annotations.Id;
-import st4s1k.jdbcplus.annotations.OneToMany;
-import st4s1k.jdbcplus.annotations.Table;
+import lombok.ToString;
+import st4s1k.jdbcplus.annotations.*;
 
 import java.util.List;
 
 @Data
+@ToString(onlyExplicitlyIncluded = true)
 @Table("entities")
 public class Entity {
 
@@ -26,4 +25,8 @@ public class Entity {
 
   @OneToMany
   private List<Entity2> entity2s;
+
+  @OneToOne(targetEntity = Entity4.class)
+  @JoinColumn("entity4")
+  private Entity4 entity4;
 }

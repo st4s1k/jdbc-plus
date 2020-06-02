@@ -6,8 +6,8 @@ import st4s1k.jdbcplus.annotations.*;
 
 @Data
 @ToString(onlyExplicitlyIncluded = true)
-@Table("entity2s")
-public class Entity2 {
+@Table("entity4s")
+public class Entity4 {
 
   @Id
   private Integer id;
@@ -18,11 +18,11 @@ public class Entity2 {
   @Column("rank")
   private Integer rank;
 
-  @ManyToOne
+  @OneToOne(targetEntity = Entity.class)
   @JoinColumn("entity")
   private Entity entity;
 
-  @ManyToOne(targetEntity = Entity3.class)
-  @JoinColumn("entity3")
-  private Entity3 entity3;
+  @OneToOne(mappedBy = "entity4")
+  @JoinColumn("entity1")
+  private Entity1 entity1;
 }

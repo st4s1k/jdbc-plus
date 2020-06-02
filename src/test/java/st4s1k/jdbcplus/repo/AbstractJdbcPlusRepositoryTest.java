@@ -29,27 +29,38 @@ class AbstractJdbcPlusRepositoryTest {
   private Entity entity;
   private Entity1 entity1;
   private Entity2 entity2;
+  private Entity3 entity3;
+  private Entity4 entity4;
 
   private AbstractJdbcPlusRepository abstractJdbcPlusRepository;
 
   @BeforeEach
   void setUp() {
     abstractJdbcPlusRepository = new AbstractJdbcPlusRepository(databaseConnection);
-    final var entity3 = getEntity3(30, "SomeEntity3", 8);
-    entity2 = getEntity2(
-        20, "SomeEntity2", 7,
-        entity, entity3
-    );
-    entity1 = getEntity1(
-        10, "SomeEntity1", 6,
-        List.of(entity2),
-        List.of(entity3)
-    );
-    entity = getEntity(
-        1, "SomeEntity", 5,
-        List.of(entity1),
-        List.of(entity2)
-    );
+
+    entity = getEntity(1, "SomeEntity", 5);
+    entity1 = getEntity1(10, "SomeEntity1", 6);
+    entity2 = getEntity2(20, "SomeEntity2", 7);
+    entity3 = getEntity3(30, "SomeEntity3", 8);
+    entity4 = getEntity4(40, "SomeEntity4", 9);
+
+    entity.setEntity1s(List.of(entity1));
+    entity.setEntity2s(List.of(entity2));
+    entity.setEntity4(entity4);
+
+    entity1.setEntity(entity);
+    entity1.setEntity2s(List.of(entity2));
+    entity1.setEntity3s(List.of(entity3));
+    entity1.setEntity4(entity4);
+
+    entity2.setEntity(entity);
+    entity2.setEntity3(entity3);
+
+    entity3.setEntity1s(List.of(entity1));
+    entity3.setEntity2s(List.of(entity2));
+
+    entity4.setEntity(entity);
+    entity4.setEntity1(entity1);
   }
 
   @Test
@@ -67,13 +78,14 @@ class AbstractJdbcPlusRepositoryTest {
   void testSqlInsert() {
     final var result = abstractJdbcPlusRepository.sqlInsert(entity);
     final var expectedStringTemplate =
-        "insert into %s(id, name, rank) values (%d, '%s', %d) returning *";
+        "insert into %s(id, name, rank, entity4) values (%d, '%s', %d, %d) returning *";
     assertThat(result).isEqualTo(
         expectedStringTemplate,
         getTableName(entity.getClass()),
         entity.getId(),
         entity.getName(),
-        entity.getRank()
+        entity.getRank(),
+        entity.getEntity4().getId()
     );
   }
 
@@ -81,12 +93,13 @@ class AbstractJdbcPlusRepositoryTest {
   void testSqlUpdate() {
     final var result = abstractJdbcPlusRepository.sqlUpdate(entity);
     final var expectedStringTemplate =
-        "update %s set name = '%s', rank = %d where id = %d returning *";
+        "update %s set name = '%s', rank = %d, entity4 = %d where id = %d returning *";
     assertThat(result).isEqualTo(
         expectedStringTemplate,
         getTableName(entity.getClass()),
         entity.getName(),
         entity.getRank(),
+        entity.getEntity4().getId(),
         entity.getId()
     );
   }
@@ -261,6 +274,8 @@ class AbstractJdbcPlusRepositoryTest {
   @Test
   void testGetObject() {
     final var entityResultSet = getEntityResultSet(entity);
+    when(databaseConnection.queryTransaction(any(), any(), any()))
+        .thenReturn(List.of(entity.getEntity4()));
     final var result = abstractJdbcPlusRepository.getObject(entityResultSet, Entity.class);
     assertEntitiesAreEqualByColumnValues(result, entity);
   }
@@ -271,6 +286,8 @@ class AbstractJdbcPlusRepositoryTest {
     when(entityResultSet.next())
         .thenReturn(true)
         .thenReturn(false);
+    when(databaseConnection.queryTransaction(any(), any(), any()))
+        .thenReturn(List.of(entity.getEntity4()));
     final var result = abstractJdbcPlusRepository.getObjects(entityResultSet, Entity.class);
     assertThat(result).hasOnlyOneElementSatisfying(
         e -> assertEntitiesAreEqualByColumnValues(e, entity)
@@ -284,7 +301,10 @@ class AbstractJdbcPlusRepositoryTest {
     columnsMap.put("id", getIdColumn(Entity.class));
     columnsMap.put("name", Entity.class.getDeclaredField("name"));
     columnsMap.put("rank", Entity.class.getDeclaredField("rank"));
+    columnsMap.put("entity4", Entity.class.getDeclaredField("entity4"));
     final var newEntity = new Entity();
+    when(databaseConnection.queryTransaction(any(), any(), any()))
+        .thenReturn(List.of(entity.getEntity4()));
     abstractJdbcPlusRepository.populateByColumnsMap(entityResultSet, newEntity, columnsMap);
     assertEntitiesAreEqualByColumnValues(newEntity, entity);
   }
@@ -293,6 +313,8 @@ class AbstractJdbcPlusRepositoryTest {
   void testPopulateColumnFields() {
     final var entityResultSet = getEntityResultSet(entity);
     final var newEntity = new Entity();
+    when(databaseConnection.queryTransaction(any(), any(), any()))
+        .thenReturn(List.of(entity.getEntity4()));
     abstractJdbcPlusRepository.populateColumnFields(entityResultSet, newEntity, Entity.class);
     assertEntitiesAreEqualByColumnValues(newEntity, entity);
   }
@@ -341,7 +363,7 @@ class AbstractJdbcPlusRepositoryTest {
   @Test
   void testPopulateManyToManyField() throws NoSuchFieldException {
     final var field = Entity1.class.getDeclaredField("entity3s");
-    final var joinTable = getJoinTable(field, Entity3.class);
+    final var joinTable = getJoinTable(field);
     final var joinColumn = joinTable.joinColumn();
     final var query = abstractJdbcPlusRepository.sqlSelectAllByColumn(
         getJoinTableName(field),

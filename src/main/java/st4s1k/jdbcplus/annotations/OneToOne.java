@@ -8,5 +8,9 @@ import java.lang.annotation.Target;
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface OneToOne {
+
   Class<?> targetEntity() default void.class;
+
+  // TODO: Implement handling for this parameter
+  String mappedBy() default "";
 }

@@ -1,11 +1,13 @@
 package st4s1k.jdbcplus.repo;
 
 import lombok.Data;
+import lombok.ToString;
 import st4s1k.jdbcplus.annotations.*;
 
 import java.util.List;
 
 @Data
+@ToString(onlyExplicitlyIncluded = true)
 @Table("entity3s")
 public class Entity3 {
 
