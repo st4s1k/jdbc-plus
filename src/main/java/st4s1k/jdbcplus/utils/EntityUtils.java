@@ -60,10 +60,7 @@ public class EntityUtils {
 
   public static String getTableName(final Class<?> clazz) {
     if (!clazz.isAnnotationPresent(Table.class)) {
-      throw new InvalidMappingException(String.format(
-          "Missing @Table annotation in class %s",
-          clazz.getName()
-      ));
+      throw new MissingAnnotationException(clazz, Table.class);
     }
     return Objects.requireNonNullElse(
         clazz.getAnnotation(Table.class).value(),
@@ -74,16 +71,7 @@ public class EntityUtils {
   public static Field getIdColumn(final Class<?> clazz) {
     final List<Field> idFields = Arrays.asList(getFieldsAnnotatedWith(Id.class, clazz));
     if (idFields.isEmpty()) {
-      throw new InvalidMappingException(String.format(
-          "Missing @Id annotation in class %s",
-          clazz.getName()
-      ));
-    }
-    if (idFields.size() > 1) {
-      throw new InvalidMappingException(String.format(
-          "Too many @Id annotated columns in class %s",
-          clazz.getName()
-      ));
+      throw new MissingAnnotationException(clazz, Id.class);
     }
     return idFields.get(0);
   }
@@ -93,7 +81,6 @@ public class EntityUtils {
   }
 
   public static String getIdColumnName(final Field field) {
-    requireNonNull(field);
     if (field.isAnnotationPresent(Id.class)) {
       return field.isAnnotationPresent(Column.class)
           ? getAnnotation(field, Column.class).value()
@@ -118,13 +105,19 @@ public class EntityUtils {
 
   public static String getColumnName(final Field field) {
     if (field.isAnnotationPresent(Column.class)) {
-      return getAnnotation(field, Column.class).value();
+      final String value = getAnnotation(field, Column.class).value();
+      return value.isEmpty() ? field.getName() : value;
     } else if (field.isAnnotationPresent(JoinColumn.class)) {
       return getJoinColumnName(field);
     } else if (field.isAnnotationPresent(Id.class)) {
       return getIdColumnName(field);
     }
-    return null;
+    throw new MissingAnnotationException(
+        field,
+        Column.class,
+        JoinColumn.class,
+        Id.class
+    );
   }
 
   public static String[] getColumnNames(final Class<?> clazz) {

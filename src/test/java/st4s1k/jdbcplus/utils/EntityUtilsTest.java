@@ -145,6 +145,14 @@ class EntityUtilsTest {
     assertThat(tableName).isEqualTo(expectedTableName);
   }
 
+  @Test
+  void testGetTableNameWhenMissingAnnotationThenThrows() {
+    assertThrows(
+        MissingAnnotationException.class,
+        () -> getTableName(InvalidEntity.class)
+    );
+  }
+
   @ParameterizedTest
   @MethodSource("paramsForGetIdColumn")
   void testGetIdColumn(
@@ -165,6 +173,14 @@ class EntityUtilsTest {
   }
 
   @Test
+  void testGetIdColumnWhenIdColumnIsMissing() {
+    assertThrows(
+        MissingAnnotationException.class,
+        () -> getIdColumn(InvalidEntity.class)
+    );
+  }
+
+  @Test
   void testGetIdColumnNameByField() {
     final var field = getFieldsAnnotatedWith(Id.class, Entity.class)[0];
     final var idColumnName = getIdColumnName(field);
@@ -176,6 +192,14 @@ class EntityUtilsTest {
     final var field = getFieldsAnnotatedWith(Id.class, Entity.class)[0];
     final var idColumnName = getIdColumnName(Entity.class);
     assertThat(idColumnName).isEqualTo(field.getName());
+  }
+
+  @Test
+  void testGetIdColumnNameWhenAnnotationIsMissingThenThrows() {
+    assertThrows(
+        MissingAnnotationException.class,
+        () -> getIdColumnName(InvalidEntity.class)
+    );
   }
 
   @Test
