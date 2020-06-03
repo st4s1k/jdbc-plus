@@ -1,7 +1,6 @@
 package st4s1k.jdbcplus.utils;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -11,10 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import st4s1k.jdbcplus.annotations.*;
 import st4s1k.jdbcplus.exceptions.InvalidColumnTypeException;
 import st4s1k.jdbcplus.exceptions.MissingAnnotationException;
-import st4s1k.jdbcplus.repo.Entity;
-import st4s1k.jdbcplus.repo.Entity1;
-import st4s1k.jdbcplus.repo.Entity2;
-import st4s1k.jdbcplus.repo.Entity3;
+import st4s1k.jdbcplus.repo.*;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -26,8 +22,7 @@ import static java.util.stream.Collectors.toMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
-import static st4s1k.jdbcplus.repo.TestUtils.getEntities;
-import static st4s1k.jdbcplus.repo.TestUtils.getEntity;
+import static st4s1k.jdbcplus.repo.TestUtils.*;
 import static st4s1k.jdbcplus.utils.EntityUtils.*;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.concatenateArrays;
 
@@ -36,8 +31,37 @@ class EntityUtilsTest {
 
   private final List<Entity> entities = getEntities(100, 5);
 
-  @BeforeEach
-  void setUp() {
+  private static Entity entity;
+  private static Entity1 entity1;
+  private static Entity2 entity2;
+  private static Entity3 entity3;
+  private static Entity4 entity4;
+
+  @BeforeAll
+  static void setUp() {
+    entity = getEntity(1, "SomeEntity", 5);
+    entity1 = getEntity1(10, "SomeEntity1", 6);
+    entity2 = getEntity2(20, "SomeEntity2", 7);
+    entity3 = getEntity3(30, "SomeEntity3", 8);
+    entity4 = getEntity4(40, "SomeEntity4", 9);
+
+    entity.setEntity1s(List.of(entity1));
+    entity.setEntity2s(List.of(entity2));
+    entity.setEntity4(entity4);
+
+    entity1.setEntity(entity);
+    entity1.setEntity2s(List.of(entity2));
+    entity1.setEntity3s(List.of(entity3));
+    entity1.setEntity4(entity4);
+
+    entity2.setEntity(entity);
+    entity2.setEntity3(entity3);
+
+    entity3.setEntity1s(List.of(entity1));
+    entity3.setEntity2s(List.of(entity2));
+
+    entity4.setEntity(entity);
+    entity4.setEntity1(entity1);
   }
 
   @Test
@@ -405,46 +429,225 @@ class EntityUtilsTest {
     );
   }
 
-  @Test
-  @Disabled
-  void testGetJoinTableName() {
-
+  @ParameterizedTest
+  @MethodSource("paramsForGetJoinTableName")
+  void testGetJoinTableName(final Field field, final String expectedJoinTableName) {
+    final var actualJoinTableName = getJoinTableName(field);
+    assertThat(actualJoinTableName).isEqualTo(expectedJoinTableName);
   }
 
-  @Test
-  @Disabled
-  void testGetJoinTableColumnName() {
-
+  private static Stream<Arguments> paramsForGetJoinTableName() throws NoSuchFieldException {
+    final var entity3s = Entity1.class.getDeclaredField("entity3s");
+    final var entity2s = Entity1.class.getDeclaredField("entity2s");
+    return Stream.of(
+        arguments(entity3s, "entity1s_entity3s"),
+        arguments(entity2s, "entity1s_entity2s")
+    );
   }
 
-  @Test
-  @Disabled
-  void testGetEntityJoinColumnName() {
-
+  @ParameterizedTest
+  @MethodSource("paramsForGetJoinTableColumnName")
+  void testGetJoinTableColumnName(final Class<?> clazz) {
+    final var actualJoinTableColumnName = generateJoinTableColumnName(clazz);
+    final var expectedJoinTableColumnName = String.format(
+        "%s_%s",
+        getTableName(clazz),
+        getIdColumnName(clazz)
+    );
+    assertThat(actualJoinTableColumnName).isEqualTo(expectedJoinTableColumnName);
   }
 
-  @Test
-  @Disabled
-  void testGetToManyFields() {
-
+  private static Stream<Arguments> paramsForGetJoinTableColumnName() {
+    return Stream.of(
+        arguments(Entity.class),
+        arguments(Entity1.class),
+        arguments(Entity2.class),
+        arguments(Entity3.class),
+        arguments(Entity4.class)
+    );
   }
 
-  @Test
-  @Disabled
-  void testGetColumnValue() {
-
+  @ParameterizedTest
+  @MethodSource("paramsForGetEntityJoinColumnName")
+  void testGetEntityJoinColumnName(final Field field, final Class<?> clazz) {
+    final var joinTable = getJoinTable(field);
+    final var joinColumn = joinTable.joinColumn();
+    final var actualEntityJoinColumnName = getEntityJoinColumnName(clazz, joinColumn);
+    final var expectedEntityJoinColumnName = joinColumn.value().isEmpty()
+        ? generateJoinTableColumnName(clazz)
+        : joinColumn.value();
+    assertThat(actualEntityJoinColumnName).isEqualTo(expectedEntityJoinColumnName);
   }
 
-  @Test
-  @Disabled
-  void testGetColumnValues() {
-
+  private static Stream<Arguments> paramsForGetEntityJoinColumnName() throws NoSuchFieldException {
+    final var entity3s = Entity1.class.getDeclaredField("entity3s");
+    final var entity2s = Entity1.class.getDeclaredField("entity2s");
+    final var entity1s = Entity3.class.getDeclaredField("entity1s");
+    return Stream.of(
+        arguments(entity3s, Entity1.class),
+        arguments(entity2s, Entity1.class),
+        arguments(entity1s, Entity3.class)
+    );
   }
 
-  @Test
-  @Disabled
-  void testGetColumnValuesAsStringForSQL() {
+  @ParameterizedTest
+  @MethodSource("paramsForGetToManyFields")
+  void testGetToManyFields(final Class<?> clazz, final Field[] expectedToManyFields) {
+    final var actualToManyFields = getToManyFields(clazz);
+    assertThat(actualToManyFields).containsExactlyInAnyOrder(expectedToManyFields);
+  }
 
+  private static Stream<Arguments> paramsForGetToManyFields() throws NoSuchFieldException {
+    return Stream.of(
+        arguments(Entity.class, new Field[]{
+            Entity.class.getDeclaredField("entity1s"),
+            Entity.class.getDeclaredField("entity2s")
+        }),
+        arguments(Entity1.class, new Field[]{
+            Entity1.class.getDeclaredField("entity2s"),
+            Entity1.class.getDeclaredField("entity3s")
+        }),
+        arguments(Entity2.class, new Field[]{}),
+        arguments(Entity3.class, new Field[]{
+            Entity3.class.getDeclaredField("entity1s"),
+            Entity3.class.getDeclaredField("entity2s")
+        }),
+        arguments(Entity4.class, new Field[]{})
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("paramsForGetColumnValue")
+  void testGetColumnValue(
+      final Field field,
+      final Object entity,
+      final Object expectedColumnValue
+  ) {
+    final Object actualColumnValue = getColumnValue(field, entity);
+    assertThat(actualColumnValue).isEqualTo(expectedColumnValue);
+  }
+
+  private static Stream<Arguments> paramsForGetColumnValue() throws NoSuchFieldException {
+    return Stream.of(
+        arguments(Entity.class.getDeclaredField("id"), entity, entity.getId()),
+        arguments(Entity.class.getDeclaredField("name"), entity, entity.getName()),
+        arguments(Entity.class.getDeclaredField("rank"), entity, entity.getRank()),
+        arguments(Entity.class.getDeclaredField("entity4"), entity, entity.getEntity4()),
+        arguments(Entity1.class.getDeclaredField("id"), entity1, entity1.getId()),
+        arguments(Entity1.class.getDeclaredField("name"), entity1, entity1.getName()),
+        arguments(Entity1.class.getDeclaredField("rank"), entity1, entity1.getRank()),
+        arguments(Entity1.class.getDeclaredField("entity"), entity1, entity1.getEntity()),
+        arguments(Entity1.class.getDeclaredField("entity4"), entity1, entity1.getEntity4()),
+        arguments(Entity2.class.getDeclaredField("id"), entity2, entity2.getId()),
+        arguments(Entity2.class.getDeclaredField("name"), entity2, entity2.getName()),
+        arguments(Entity2.class.getDeclaredField("rank"), entity2, entity2.getRank()),
+        arguments(Entity2.class.getDeclaredField("entity"), entity2, entity2.getEntity()),
+        arguments(Entity2.class.getDeclaredField("entity3"), entity2, entity2.getEntity3()),
+        arguments(Entity3.class.getDeclaredField("id"), entity3, entity3.getId()),
+        arguments(Entity3.class.getDeclaredField("name"), entity3, entity3.getName()),
+        arguments(Entity3.class.getDeclaredField("rank"), entity3, entity3.getRank()),
+        arguments(Entity4.class.getDeclaredField("id"), entity4, entity4.getId()),
+        arguments(Entity4.class.getDeclaredField("name"), entity4, entity4.getName()),
+        arguments(Entity4.class.getDeclaredField("rank"), entity4, entity4.getRank()),
+        arguments(Entity4.class.getDeclaredField("entity"), entity4, entity4.getEntity()),
+        arguments(Entity4.class.getDeclaredField("entity1"), entity4, entity4.getEntity1())
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("paramsForGetColumnValues")
+  void testGetColumnValues(
+      final Object entity,
+      final Class<?> clazz,
+      final Object[] expectedColumnValues
+  ) {
+    final Object[] actualColumnValues = getColumnValues(entity, clazz);
+    assertThat(actualColumnValues).containsExactly(expectedColumnValues);
+  }
+
+  private static Stream<Arguments> paramsForGetColumnValues() {
+    return Stream.of(
+        arguments(entity, Entity.class, new Object[]{
+            entity.getId(),
+            entity.getName(),
+            entity.getRank(),
+            entity.getEntity4()
+        }),
+        arguments(entity1, Entity1.class, new Object[]{
+            entity1.getId(),
+            entity1.getName(),
+            entity1.getRank(),
+            entity1.getEntity(),
+            entity1.getEntity4()
+        }),
+        arguments(entity2, Entity2.class, new Object[]{
+            entity2.getId(),
+            entity2.getName(),
+            entity2.getRank(),
+            entity2.getEntity(),
+            entity2.getEntity3()
+        }),
+        arguments(entity3, Entity3.class, new Object[]{
+            entity3.getId(),
+            entity3.getName(),
+            entity3.getRank()
+        }),
+        arguments(entity4, Entity4.class, new Object[]{
+            entity4.getId(),
+            entity4.getName(),
+            entity4.getRank(),
+            entity4.getEntity(),
+            entity4.getEntity1()
+        })
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("paramsForGetColumnValuesAsStringForSQL")
+  void testGetColumnValuesAsStringForSQL(
+      final Object entity,
+      final Class<?> clazz,
+      final Object[] expectedColumnValues
+  ) {
+    final Object[] actualColumnValues = getColumnValuesAsStringForSQL(entity, clazz);
+    assertThat(actualColumnValues).containsExactly(expectedColumnValues);
+  }
+
+  private static Stream<Arguments> paramsForGetColumnValuesAsStringForSQL() {
+    return Stream.of(
+        arguments(entity, Entity.class, new Object[]{
+            getStringValueForSql(entity.getId()),
+            getStringValueForSql(entity.getName()),
+            getStringValueForSql(entity.getRank()),
+            getStringValueForSql(entity.getEntity4().getId())
+        }),
+        arguments(entity1, Entity1.class, new Object[]{
+            getStringValueForSql(entity1.getId()),
+            getStringValueForSql(entity1.getName()),
+            getStringValueForSql(entity1.getRank()),
+            getStringValueForSql(entity1.getEntity().getId()),
+            getStringValueForSql(entity1.getEntity4().getId())
+        }),
+        arguments(entity2, Entity2.class, new Object[]{
+            getStringValueForSql(entity2.getId()),
+            getStringValueForSql(entity2.getName()),
+            getStringValueForSql(entity2.getRank()),
+            getStringValueForSql(entity2.getEntity().getId()),
+            getStringValueForSql(entity2.getEntity3().getId())
+        }),
+        arguments(entity3, Entity3.class, new Object[]{
+            getStringValueForSql(entity3.getId()),
+            getStringValueForSql(entity3.getName()),
+            getStringValueForSql(entity3.getRank())
+        }),
+        arguments(entity4, Entity4.class, new Object[]{
+            getStringValueForSql(entity4.getId()),
+            getStringValueForSql(entity4.getName()),
+            getStringValueForSql(entity4.getRank()),
+            getStringValueForSql(entity4.getEntity().getId()),
+            getStringValueForSql(entity4.getEntity1().getId())
+        })
+    );
   }
 
   @Test

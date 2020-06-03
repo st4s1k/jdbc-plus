@@ -5,15 +5,20 @@ import java.util.function.UnaryOperator;
 
 import static java.lang.Character.isLowerCase;
 import static java.lang.Character.isUpperCase;
+import static java.lang.System.Logger.Level.ERROR;
 
 public class JdbcPlusUtils {
+
+  private static final System.Logger LOGGER = System.getLogger("JdbcPlusUtils");
 
   private JdbcPlusUtils() {
   }
 
   @SuppressWarnings("unchecked")
-  public static <T> T[] concatenateArrays(final Class<T> clazz,
-                                          final T[]... arrays) {
+  public static <T> T[] concatenateArrays(
+      final Class<T> clazz,
+      final T[]... arrays
+  ) {
     int arrLen = calcArraysLength(arrays);
     final T[] newArr = (T[]) Array.newInstance(clazz, arrLen);
     if (arrLen > 0) {
@@ -50,8 +55,10 @@ public class JdbcPlusUtils {
     return toSnakeCase(str, String::toUpperCase);
   }
 
-  private static String toSnakeCase(final String str,
-                                    final UnaryOperator<String> postProcess) {
+  private static String toSnakeCase(
+      final String str,
+      final UnaryOperator<String> postProcess
+  ) {
     final StringBuilder result = new StringBuilder(str);
     if (str.length() > 1) {
       for (int i = 1; i < result.length(); i++) {
@@ -75,7 +82,7 @@ public class JdbcPlusUtils {
     try {
       return clazz.getConstructor().newInstance();
     } catch (Exception e) {
-      e.printStackTrace();
+      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
       return null;
     }
   }

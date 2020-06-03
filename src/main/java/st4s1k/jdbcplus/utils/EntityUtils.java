@@ -104,13 +104,12 @@ public class EntityUtils {
   }
 
   public static Field[] getColumns(final Class<?> clazz) {
-    return concatenateArrays(
-        Field.class,
-        new Field[]{getIdColumn(clazz)},
-        getColumnFields(clazz),
-        getOneToOneFields(clazz),
-        getManyToOneFields(clazz)
-    );
+    return Arrays.stream(clazz.getDeclaredFields())
+        .filter(field -> field.isAnnotationPresent(Id.class)
+            || field.isAnnotationPresent(Column.class)
+            || field.isAnnotationPresent(OneToOne.class)
+            || field.isAnnotationPresent(ManyToOne.class))
+        .toArray(Field[]::new);
   }
 
   public static Field[] getColumnFields(final Class<?> clazz) {
@@ -245,7 +244,7 @@ public class EntityUtils {
     return getAnnotation(field, JoinTable.class).value();
   }
 
-  public static String getJoinTableColumnName(final Class<?> entityClass) {
+  public static String generateJoinTableColumnName(final Class<?> entityClass) {
     return String.format("%s_%s", getTableName(entityClass), getIdColumnName(entityClass));
   }
 
@@ -254,16 +253,17 @@ public class EntityUtils {
       final JoinColumn joinColumn
   ) {
     return joinColumn.value().isEmpty()
-        ? getJoinTableColumnName(clazz)
+        ? generateJoinTableColumnName(clazz)
         : joinColumn.value();
   }
 
   public static Field[] getManyToManyFields(final Class<?> clazz) {
     final Field[] fields = getFieldsAnnotatedWith(ManyToMany.class, clazz);
     for (Field field : fields) {
-      if (!field.isAnnotationPresent(JoinTable.class)) {
+      if (!field.isAnnotationPresent(JoinTable.class)
+          && field.getAnnotation(ManyToMany.class).mappedBy().isEmpty()) {
         throw new InvalidMappingException(String.format(
-            "Missing @JoinTable annotation in class%s at field %s",
+            "Missing @JoinTable annotation or mappedBy, in class%s at field %s",
             clazz.getName(),
             field.getName()
         ));
