@@ -1,10 +1,12 @@
 package st4s1k.jdbcplus.repo;
 
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import st4s1k.jdbcplus.config.DatabaseConnection;
 import st4s1k.jdbcplus.utils.EntityUtils;
 
 import java.sql.ResultSet;
@@ -12,21 +14,24 @@ import java.sql.ResultSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.util.ReflectionTestUtils.setField;
 
 @ExtendWith(MockitoExtension.class)
 class JdbcPlusRepositoryTest {
 
   @Mock
-  private AbstractJdbcPlusRepository abstractJdbcPlusRepository;
-
-  private EntityRepository jdbcPlusRepository;
-
-  @Mock
   private Entity entity;
 
+  private AbstractJdbcPlusRepository abstractJdbcPlusRepository;
+  private EntityRepository jdbcPlusRepository;
+
   @BeforeEach
+  @SneakyThrows
   void setUp() {
-    jdbcPlusRepository = new EntityRepository(abstractJdbcPlusRepository);
+    setField(DatabaseConnection.class, "instance", mock(DatabaseConnection.class));
+    setField(AbstractJdbcPlusRepository.class, "instance", mock(AbstractJdbcPlusRepository.class));
+    abstractJdbcPlusRepository = AbstractJdbcPlusRepository.getInstance();
+    jdbcPlusRepository = new EntityRepository();
   }
 
   @Test

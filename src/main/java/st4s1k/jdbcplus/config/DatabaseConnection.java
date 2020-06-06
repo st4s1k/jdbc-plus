@@ -1,5 +1,8 @@
 package st4s1k.jdbcplus.config;
 
+import st4s1k.jdbcplus.exceptions.InstanceAlreadyInitializedException;
+import st4s1k.jdbcplus.exceptions.InstanceNotInitializedException;
+
 import javax.sql.DataSource;
 import java.lang.System.Logger;
 import java.sql.Connection;
@@ -14,11 +17,32 @@ import static java.lang.System.Logger.Level.ERROR;
 
 public class DatabaseConnection {
 
-  private static final Logger LOGGER = System.getLogger("DatabaseConnection");
-  private final DataSource dataSource;
+  private static volatile DatabaseConnection instance;
+  private static volatile DataSource dataSource;
+  private static volatile Logger logger;
 
-  public DatabaseConnection(final DataSource dataSource) {
-    this.dataSource = dataSource;
+  public static DatabaseConnection getInstance() {
+    if (instance == null) {
+      throw new InstanceNotInitializedException();
+    }
+    return instance;
+  }
+
+  public static void init(final DataSource dataSource) {
+    if (instance == null) {
+      synchronized (DatabaseConnection.class) {
+        if (instance == null) {
+          instance = new DatabaseConnection();
+          logger = System.getLogger("DatabaseConnection");
+          DatabaseConnection.dataSource = dataSource;
+        }
+      }
+    } else {
+      throw new InstanceAlreadyInitializedException();
+    }
+  }
+
+  private DatabaseConnection() {
   }
 
   public <T> T queryTransaction(
@@ -33,11 +57,11 @@ public class DatabaseConnection {
         connection.commit();
         return operation.apply(resultSet);
       } catch (Exception e) {
-        LOGGER.log(ERROR, e.getLocalizedMessage(), e);
+        logger.log(ERROR, e.getLocalizedMessage(), e);
         connection.rollback();
       }
     } catch (SQLException e) {
-      LOGGER.log(ERROR, e.getLocalizedMessage(), e);
+      logger.log(ERROR, e.getLocalizedMessage(), e);
     }
     return defaultResult.get();
   }

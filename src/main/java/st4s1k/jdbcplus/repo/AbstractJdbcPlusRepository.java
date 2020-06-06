@@ -22,21 +22,24 @@ import static st4s1k.jdbcplus.utils.JdbcPlusUtils.getClassInstance;
 
 public class AbstractJdbcPlusRepository {
 
-  private final Logger logger;
+  private static volatile AbstractJdbcPlusRepository instance;
+  private static volatile DatabaseConnection databaseConnection;
+  private static volatile Logger logger;
 
-  private final DatabaseConnection databaseConnection;
-
-  public AbstractJdbcPlusRepository(final DatabaseConnection databaseConnection) {
-    this.databaseConnection = databaseConnection;
-    logger = getLogger("AbstractJdbcPlusRepository");
+  public static AbstractJdbcPlusRepository getInstance() {
+    if (instance == null) {
+      synchronized (AbstractJdbcPlusRepository.class) {
+        if (instance == null) {
+          instance = new AbstractJdbcPlusRepository();
+          databaseConnection = DatabaseConnection.getInstance();
+          logger = getLogger("AbstractJdbcPlusRepository");
+        }
+      }
+    }
+    return instance;
   }
 
-  public AbstractJdbcPlusRepository(
-      final DatabaseConnection databaseConnection,
-      final Logger logger
-  ) {
-    this.logger = logger;
-    this.databaseConnection = databaseConnection;
+  private AbstractJdbcPlusRepository() {
   }
 
   @SuppressWarnings("unchecked")

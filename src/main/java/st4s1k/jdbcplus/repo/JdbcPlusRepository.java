@@ -8,25 +8,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class JdbcPlusRepository<T> {
+public abstract class JdbcPlusRepository<T> {
 
   private final AbstractJdbcPlusRepository abstractJdbcPlusRepository;
   private final Class<T> entityClass;
 
   @SuppressWarnings("unchecked")
-  public JdbcPlusRepository(final AbstractJdbcPlusRepository abstractJdbcPlusRepository) {
-    this.abstractJdbcPlusRepository = abstractJdbcPlusRepository;
-    entityClass = (Class<T>) ((ParameterizedType) getClass()
-        .getGenericSuperclass()).getActualTypeArguments()[0];
-  }
-
-  /**
-   * Get the entity class.
-   *
-   * @return the class of the entity
-   */
-  private Class<T> getEntityClass() {
-    return entityClass;
+  public JdbcPlusRepository() {
+    entityClass = (Class<T>) ((ParameterizedType) getClass().getGenericSuperclass())
+        .getActualTypeArguments()[0];
+    abstractJdbcPlusRepository = AbstractJdbcPlusRepository.getInstance();
   }
 
   /**
@@ -35,7 +26,7 @@ public class JdbcPlusRepository<T> {
    * @return table name
    */
   public String getTableName() {
-    return EntityUtils.getTableName(getEntityClass());
+    return EntityUtils.getTableName(entityClass);
   }
 
   /**
@@ -85,7 +76,7 @@ public class JdbcPlusRepository<T> {
    * @return {@link Optional} found entity
    */
   public Optional<T> findById(final Object id) {
-    return abstractJdbcPlusRepository.findById(id, getEntityClass());
+    return abstractJdbcPlusRepository.findById(id, entityClass);
   }
 
   /**
@@ -94,7 +85,7 @@ public class JdbcPlusRepository<T> {
    * @return a list of found entities
    */
   public List<T> findAll() {
-    return abstractJdbcPlusRepository.findAll(getEntityClass());
+    return abstractJdbcPlusRepository.findAll(entityClass);
   }
 
   /**
@@ -109,7 +100,7 @@ public class JdbcPlusRepository<T> {
       final String column,
       final Object value
   ) {
-    return abstractJdbcPlusRepository.findByColumn(column, value, getEntityClass());
+    return abstractJdbcPlusRepository.findByColumn(column, value, entityClass);
   }
 
   /**
@@ -119,7 +110,7 @@ public class JdbcPlusRepository<T> {
    * @return extracted entity
    */
   public T getObject(final ResultSet resultSet) {
-    return abstractJdbcPlusRepository.getObject(resultSet, getEntityClass());
+    return abstractJdbcPlusRepository.getObject(resultSet, entityClass);
   }
 
   /**
@@ -129,6 +120,6 @@ public class JdbcPlusRepository<T> {
    * @return a list of extracted entities
    */
   public List<T> getObjects(final ResultSet resultSet) {
-    return new ArrayList<>(abstractJdbcPlusRepository.getObjects(resultSet, getEntityClass()));
+    return new ArrayList<>(abstractJdbcPlusRepository.getObjects(resultSet, entityClass));
   }
 }

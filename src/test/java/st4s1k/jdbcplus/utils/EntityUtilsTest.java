@@ -22,7 +22,7 @@ import static java.util.stream.Collectors.toMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
-import static st4s1k.jdbcplus.repo.TestUtils.*;
+import static st4s1k.jdbcplus.TestUtils.*;
 import static st4s1k.jdbcplus.utils.EntityUtils.*;
 import static st4s1k.jdbcplus.utils.JdbcPlusUtils.concatenateArrays;
 

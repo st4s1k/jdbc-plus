@@ -1,6 +1,7 @@
-package st4s1k.jdbcplus.repo;
+package st4s1k.jdbcplus;
 
 import lombok.SneakyThrows;
+import st4s1k.jdbcplus.repo.*;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
