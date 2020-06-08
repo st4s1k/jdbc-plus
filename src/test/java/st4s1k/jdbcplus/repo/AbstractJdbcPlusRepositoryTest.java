@@ -27,8 +27,6 @@ class AbstractJdbcPlusRepositoryTest {
   private Entity entity;
   private Entity1 entity1;
   private Entity2 entity2;
-  private Entity3 entity3;
-  private Entity4 entity4;
 
   private DatabaseConnection databaseConnection;
   private AbstractJdbcPlusRepository abstractJdbcPlusRepository;
@@ -45,8 +43,9 @@ class AbstractJdbcPlusRepositoryTest {
     entity = getEntity(1, "SomeEntity", 5);
     entity1 = getEntity1(10, "SomeEntity1", 6);
     entity2 = getEntity2(20, "SomeEntity2", 7);
-    entity3 = getEntity3(30, "SomeEntity3", 8);
-    entity4 = getEntity4(40, "SomeEntity4", 9);
+
+    final var entity3 = getEntity3(30, "SomeEntity3", 8);
+    final var entity4 = getEntity4(40, "SomeEntity4", 9);
 
     entity.setEntity1s(List.of(entity1));
     entity.setEntity2s(List.of(entity2));
@@ -71,9 +70,10 @@ class AbstractJdbcPlusRepositoryTest {
   void testSqlRemove() {
     final var result = abstractJdbcPlusRepository.sqlRemove(entity);
     final var expectedStringTemplate = "delete from %s where id = %d returning *";
+    final var tableName = getTableName(entity.getClass());
     assertThat(result).isEqualTo(
         expectedStringTemplate,
-        getTableName(entity.getClass()),
+        tableName,
         entity.getId()
     );
   }
@@ -83,9 +83,10 @@ class AbstractJdbcPlusRepositoryTest {
     final var result = abstractJdbcPlusRepository.sqlInsert(entity);
     final var expectedStringTemplate =
         "insert into %s(id, name, rank, entity4) values (%d, '%s', %d, %d) returning *";
+    final var tableName = getTableName(entity.getClass());
     assertThat(result).isEqualTo(
         expectedStringTemplate,
-        getTableName(entity.getClass()),
+        tableName,
         entity.getId(),
         entity.getName(),
         entity.getRank(),
@@ -98,9 +99,10 @@ class AbstractJdbcPlusRepositoryTest {
     final var result = abstractJdbcPlusRepository.sqlUpdate(entity);
     final var expectedStringTemplate =
         "update %s set name = '%s', rank = %d, entity4 = %d where id = %d returning *";
+    final var tableName = getTableName(entity.getClass());
     assertThat(result).isEqualTo(
         expectedStringTemplate,
-        getTableName(entity.getClass()),
+        tableName,
         entity.getName(),
         entity.getRank(),
         entity.getEntity4().getId(),
@@ -110,11 +112,12 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testSqlSelectAll() {
-    final var result = abstractJdbcPlusRepository.sqlSelectAll(getTableName(entity.getClass()));
+    final var tableName = getTableName(entity.getClass());
+    final var result = abstractJdbcPlusRepository.sqlSelectAll(tableName);
     final var expectedStringTemplate = "select * from %s";
     assertThat(result).isEqualTo(
         expectedStringTemplate,
-        getTableName(entity.getClass())
+        tableName
     );
   }
 
@@ -122,15 +125,16 @@ class AbstractJdbcPlusRepositoryTest {
   void testSqlSelectAllByColumn() {
     final var column = "name";
     final var value = "SomeEntity";
+    final var tableName = getTableName(entity.getClass());
     final var result = abstractJdbcPlusRepository.sqlSelectAllByColumn(
-        getTableName(entity.getClass()),
+        tableName,
         column,
         value
     );
     final var expectedStringTemplate = "select * from %s where %s = '%s'";
     assertThat(result).isEqualTo(
         expectedStringTemplate,
-        getTableName(entity.getClass()),
+        tableName,
         column,
         value
     );
@@ -142,15 +146,16 @@ class AbstractJdbcPlusRepositoryTest {
     final var column2 = "column2";
     final var value1 = "value1";
     final var value2 = "value2";
+    final var tableName = getTableName(entity.getClass());
     final var result = abstractJdbcPlusRepository.sqlSelectAllByColumns(
-        getTableName(entity.getClass()),
+        tableName,
         new String[]{column1, column2},
         new Object[]{value1, value2}
     );
     final var expectedStringTemplate = "select * from %s where %s = '%s', %s = '%s'";
     assertThat(result).isEqualTo(
         expectedStringTemplate,
-        getTableName(entity.getClass()),
+        tableName,
         column1, value1,
         column2, value2
     );
@@ -158,15 +163,16 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testSqlSelectAllByColumnsWhenNumberOfColumnsIsZero() {
+    final var tableName = getTableName(entity.getClass());
     final var result = abstractJdbcPlusRepository.sqlSelectAllByColumns(
-        getTableName(entity.getClass()),
+        tableName,
         new String[]{},
         new Object[]{}
     );
     final var expectedStringTemplate = "";
     assertThat(result).isEqualTo(
         expectedStringTemplate,
-        getTableName(entity.getClass())
+        tableName
     );
   }
 
@@ -175,15 +181,16 @@ class AbstractJdbcPlusRepositoryTest {
     final var column1 = "column1";
     final var value1 = "value1";
     final var value2 = "value2";
+    final var tableName = getTableName(entity.getClass());
     final var result = abstractJdbcPlusRepository.sqlSelectAllByColumns(
-        getTableName(entity.getClass()),
+        tableName,
         new String[]{column1},
         new Object[]{value1, value2}
     );
     final var expectedStringTemplate = "";
     assertThat(result).isEqualTo(
         expectedStringTemplate,
-        getTableName(entity.getClass()),
+        tableName,
         column1, value1,
         value2
     );
@@ -198,8 +205,9 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testUpdate() {
+    final var tableName = getTableName(entity.getClass());
     final var selectQuery = abstractJdbcPlusRepository.sqlSelectAllByColumn(
-        getTableName(entity.getClass()),
+        tableName,
         "id",
         entity.getId()
     );
@@ -215,8 +223,9 @@ class AbstractJdbcPlusRepositoryTest {
 
   @Test
   void testRemove() {
+    final var tableName = getTableName(entity.getClass());
     final var selectQuery = abstractJdbcPlusRepository.sqlSelectAllByColumn(
-        getTableName(entity.getClass()),
+        tableName,
         "id",
         entity.getId()
     );
@@ -233,8 +242,9 @@ class AbstractJdbcPlusRepositoryTest {
   @Test
   void testFind() {
     abstractJdbcPlusRepository.find(entity);
+    final var tableName = getTableName(entity.getClass());
     final var expectedQuery = abstractJdbcPlusRepository.sqlSelectAllByColumns(
-        getTableName(entity.getClass()),
+        tableName,
         getColumnNames(Entity.class),
         getColumnValues(entity, Entity.class)
     );
@@ -244,7 +254,8 @@ class AbstractJdbcPlusRepositoryTest {
   @Test
   void testFindAll() {
     abstractJdbcPlusRepository.findAll(Entity.class);
-    final var expectedQuery = abstractJdbcPlusRepository.sqlSelectAll(getTableName(entity.getClass()));
+    final var tableName = getTableName(entity.getClass());
+    final var expectedQuery = abstractJdbcPlusRepository.sqlSelectAll(tableName);
     verify(databaseConnection).queryTransaction(eq(expectedQuery), any(), any());
   }
 
@@ -253,8 +264,9 @@ class AbstractJdbcPlusRepositoryTest {
     final var column = "name";
     final var value = "SomeEntity";
     abstractJdbcPlusRepository.findByColumn(column, value, Entity.class);
+    final var tableName = getTableName(entity.getClass());
     final var expectedQuery = abstractJdbcPlusRepository.sqlSelectAllByColumn(
-        getTableName(entity.getClass()),
+        tableName,
         column,
         value
     );
@@ -264,8 +276,9 @@ class AbstractJdbcPlusRepositoryTest {
   @Test
   void testFindById() {
     final var entityId = entity.getId();
+    final var tableName = getTableName(entity.getClass());
     final var expectedQuery = abstractJdbcPlusRepository.sqlSelectAllByColumn(
-        getTableName(entity.getClass()),
+        tableName,
         "id",
         entityId
     );
