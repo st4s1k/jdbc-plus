@@ -1,5 +1,6 @@
 package st4s1k.jdbcplus.config;
 
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,6 +11,7 @@ import st4s1k.jdbcplus.exceptions.InstanceAlreadyInitializedException;
 import st4s1k.jdbcplus.exceptions.InstanceNotInitializedException;
 
 import javax.sql.DataSource;
+import java.lang.reflect.InvocationTargetException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -41,6 +43,19 @@ class DatabaseConnectionTest {
   @AfterEach
   void tearDown() {
     DatabaseConnectionTestUtils.resetDatabaseConnection();
+  }
+
+  @Test
+  @SneakyThrows
+  void testConstructorWhenInstanceAlreadyInitializedThenThrows() {
+    DatabaseConnection.init(dataSource);
+    final var constructor = DatabaseConnection.class.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    final var exception = assertThrows(
+        InvocationTargetException.class,
+        constructor::newInstance
+    );
+    assertThat(exception).hasCauseExactlyInstanceOf(InstanceAlreadyInitializedException.class);
   }
 
   @Test

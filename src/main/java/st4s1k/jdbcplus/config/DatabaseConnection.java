@@ -24,6 +24,9 @@ public class DatabaseConnection {
   private static volatile Logger logger;
 
   private DatabaseConnection() {
+    if (instance != null) {
+      throw new InstanceAlreadyInitializedException();
+    }
   }
 
   public static DatabaseConnection getInstance() {
