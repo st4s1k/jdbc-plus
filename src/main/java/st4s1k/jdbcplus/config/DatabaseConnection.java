@@ -2,6 +2,7 @@ package st4s1k.jdbcplus.config;
 
 import st4s1k.jdbcplus.exceptions.InstanceAlreadyInitializedException;
 import st4s1k.jdbcplus.exceptions.InstanceNotInitializedException;
+import st4s1k.jdbcplus.function.ConnectionFunction;
 
 import javax.sql.DataSource;
 import java.lang.System.Logger;
@@ -14,12 +15,16 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static java.lang.System.Logger.Level.ERROR;
+import static java.util.Objects.requireNonNull;
 
 public class DatabaseConnection {
 
   private static volatile DatabaseConnection instance;
   private static volatile DataSource dataSource;
   private static volatile Logger logger;
+
+  private DatabaseConnection() {
+  }
 
   public static DatabaseConnection getInstance() {
     if (instance == null) {
@@ -34,7 +39,7 @@ public class DatabaseConnection {
         if (instance == null) {
           instance = new DatabaseConnection();
           logger = System.getLogger("DatabaseConnection");
-          DatabaseConnection.dataSource = dataSource;
+          DatabaseConnection.dataSource = requireNonNull(dataSource);
         }
       }
     } else {
@@ -42,28 +47,25 @@ public class DatabaseConnection {
     }
   }
 
-  private DatabaseConnection() {
-  }
-
   public <T> T queryTransaction(
       final String query,
       final Function<ResultSet, T> operation,
       final Supplier<T> defaultResult
   ) {
-    try (Connection connection = dataSource.getConnection()) {
-      connection.setAutoCommit(false);
-      try (Statement statement = connection.createStatement();
-           ResultSet resultSet = statement.executeQuery(query)) {
-        connection.commit();
-        return operation.apply(resultSet);
-      } catch (Exception e) {
-        logger.log(ERROR, e.getLocalizedMessage(), e);
-        connection.rollback();
-      }
-    } catch (SQLException e) {
-      logger.log(ERROR, e.getLocalizedMessage(), e);
-    }
-    return defaultResult.get();
+    return applyConnection(
+        connection -> {
+          try (final Statement statement = connection.createStatement();
+               final ResultSet resultSet = statement.executeQuery(query)) {
+            connection.commit();
+            return operation.apply(resultSet);
+          } catch (final Exception e) {
+            logger.log(ERROR, e.getLocalizedMessage(), e);
+            connection.rollback();
+            return defaultResult.get();
+          }
+        },
+        defaultResult
+    );
   }
 
   public <T> Optional<T> queryTransaction(
@@ -75,5 +77,18 @@ public class DatabaseConnection {
         resultSet -> Optional.ofNullable(operation.apply(resultSet)),
         Optional::empty
     );
+  }
+
+  private <T> T applyConnection(
+      final ConnectionFunction<T> connectionFunction,
+      final Supplier<T> defaultResult
+  ) {
+    try (final Connection connection = dataSource.getConnection()) {
+      connection.setAutoCommit(false);
+      return connectionFunction.apply(connection);
+    } catch (final SQLException e) {
+      logger.log(ERROR, e.getLocalizedMessage(), e);
+      return defaultResult.get();
+    }
   }
 }

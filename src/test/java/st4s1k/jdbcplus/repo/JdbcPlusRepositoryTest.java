@@ -1,11 +1,13 @@
 package st4s1k.jdbcplus.repo;
 
 import lombok.SneakyThrows;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import st4s1k.jdbcplus.DatabaseConnectionTestUtils;
 import st4s1k.jdbcplus.config.DatabaseConnection;
 import st4s1k.jdbcplus.utils.EntityUtils;
 
@@ -28,10 +30,15 @@ class JdbcPlusRepositoryTest {
   @BeforeEach
   @SneakyThrows
   void setUp() {
-    setField(DatabaseConnection.class, "instance", mock(DatabaseConnection.class));
-    setField(AbstractJdbcPlusRepository.class, "instance", mock(AbstractJdbcPlusRepository.class));
-    abstractJdbcPlusRepository = AbstractJdbcPlusRepository.getInstance();
+    DatabaseConnectionTestUtils.setInstance(mock(DatabaseConnection.class));
+    abstractJdbcPlusRepository = mock(AbstractJdbcPlusRepository.class);
+    setField(AbstractJdbcPlusRepository.class, "instance", abstractJdbcPlusRepository);
     jdbcPlusRepository = new EntityRepository();
+  }
+
+  @AfterEach
+  void tearDown() {
+    DatabaseConnectionTestUtils.resetDatabaseConnection();
   }
 
   @Test
