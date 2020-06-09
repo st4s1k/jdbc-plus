@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface JoinTable {
 
-  String value();
+  String name();
 
   JoinColumn joinColumn() default @JoinColumn("");
 

@@ -25,12 +25,12 @@ public class Entity1 {
   private Entity entity;
 
   @ManyToMany(targetEntity = Entity2.class)
-  @JoinTable("entity1s_entity2s")
+  @JoinTable(name = "entity1s_entity2s")
   private List<Entity2> entity2s;
 
   @ManyToMany
   @JoinTable(
-      value = "entity1s_entity3s",
+      name = "entity1s_entity3s",
       joinColumn = @JoinColumn("id1"),
       inverseJoinColumn = @JoinColumn("id3"))
   private List<Entity3> entity3s;

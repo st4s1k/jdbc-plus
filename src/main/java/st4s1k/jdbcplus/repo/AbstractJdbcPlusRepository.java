@@ -485,7 +485,7 @@ public class AbstractJdbcPlusRepository {
           inverseJoinColumn
       );
       final String query = sqlSelectAllByColumn(
-          joinTable.value(),
+          joinTable.name(),
           currentEntityIdColumnName,
           getIdColumnValue(entity)
       );

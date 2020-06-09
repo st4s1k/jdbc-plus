@@ -43,8 +43,13 @@ class JdbcPlusRepositoryTest {
 
   @Test
   void testGetTableName() {
+    // Given
     final String expected = EntityUtils.getTableName(Entity.class);
+
+    // When
     final String actual = jdbcPlusRepository.getTableName();
+
+    // Then
     assertThat(actual).isEqualTo(expected);
   }
 
@@ -56,53 +61,83 @@ class JdbcPlusRepositoryTest {
 
   @Test
   void testUpdate() {
+    // When
     jdbcPlusRepository.update(entity);
+
+    // Then
     verify(abstractJdbcPlusRepository).update(entity);
   }
 
   @Test
   void testRemove() {
+    // When
     jdbcPlusRepository.remove(entity);
+
+    // Then
     verify(abstractJdbcPlusRepository).remove(entity);
   }
 
   @Test
   void testFind() {
+    // When
     jdbcPlusRepository.find(entity);
+
+    // Then
     verify(abstractJdbcPlusRepository).find(entity);
   }
 
   @Test
   void testFindById() {
+    // When
     jdbcPlusRepository.findById(entity);
+
+    // Then
     verify(abstractJdbcPlusRepository).findById(entity, Entity.class);
   }
 
   @Test
   void testFindAll() {
+    // When
     jdbcPlusRepository.findAll();
+
+    // Then
     verify(abstractJdbcPlusRepository).findAll(Entity.class);
   }
 
   @Test
   void testFindByColumn() {
+    // Given
     final var column = "column";
     final var value = new Object();
+
+    // When
     jdbcPlusRepository.findByColumn(column, value);
+
+    // Then
     verify(abstractJdbcPlusRepository).findByColumn(column, value, Entity.class);
   }
 
   @Test
   void testGetObject() {
+    // Given
     final var resultSet = mock(ResultSet.class);
+
+    // When
     jdbcPlusRepository.getObject(resultSet);
+
+    // Then
     verify(abstractJdbcPlusRepository).getObject(resultSet, Entity.class);
   }
 
   @Test
   void testGetObjects() {
+    // Given
     final var resultSet = mock(ResultSet.class);
+
+    // When
     jdbcPlusRepository.getObjects(resultSet);
+
+    // Then
     verify(abstractJdbcPlusRepository).getObjects(resultSet, Entity.class);
   }
 }

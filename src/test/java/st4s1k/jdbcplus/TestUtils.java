@@ -3,9 +3,11 @@ package st4s1k.jdbcplus;
 import lombok.SneakyThrows;
 import st4s1k.jdbcplus.repo.*;
 
+import java.lang.reflect.Field;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -14,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static st4s1k.jdbcplus.utils.EntityUtils.getColumnValues;
+import static st4s1k.jdbcplus.utils.EntityUtils.getIdColumn;
 
 public class TestUtils {
 
@@ -27,6 +30,16 @@ public class TestUtils {
     final var entity1ColumnValues = getColumnValues(entity1, Entity.class);
     final var entity2ColumnValues = getColumnValues(entity2, Entity.class);
     assertThat(entity1ColumnValues).containsExactly(entity2ColumnValues);
+  }
+
+
+  public static HashMap<String, Field> getEntityColumnsMap() throws NoSuchFieldException {
+    final HashMap<String, Field> columnsMap = new HashMap<>();
+    columnsMap.put("id", getIdColumn(Entity.class));
+    columnsMap.put("name", Entity.class.getDeclaredField("name"));
+    columnsMap.put("rank", Entity.class.getDeclaredField("rank"));
+    columnsMap.put("entity4", Entity.class.getDeclaredField("entity4"));
+    return columnsMap;
   }
 
   @SneakyThrows

@@ -1,12 +1,13 @@
 package st4s1k.jdbcplus.utils;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.junit.jupiter.MockitoExtension;
+import st4s1k.jdbcplus.Function;
 import st4s1k.jdbcplus.annotations.*;
 import st4s1k.jdbcplus.exceptions.InvalidColumnTypeException;
 import st4s1k.jdbcplus.exceptions.MissingAnnotationException;
@@ -29,63 +30,41 @@ import static st4s1k.jdbcplus.utils.JdbcPlusUtils.concatenateArrays;
 @ExtendWith(MockitoExtension.class)
 class EntityUtilsTest {
 
-  private final List<Entity> entities = getEntities(100, 5);
-
-  private static Entity entity;
-  private static Entity1 entity1;
-  private static Entity2 entity2;
-  private static Entity3 entity3;
-  private static Entity4 entity4;
-
-  @BeforeAll
-  static void setUp() {
-    entity = getEntity(1, "SomeEntity", 5);
-    entity1 = getEntity1(10, "SomeEntity1", 6);
-    entity2 = getEntity2(20, "SomeEntity2", 7);
-    entity3 = getEntity3(30, "SomeEntity3", 8);
-    entity4 = getEntity4(40, "SomeEntity4", 9);
-
-    entity.setEntity1s(List.of(entity1));
-    entity.setEntity2s(List.of(entity2));
-    entity.setEntity4(entity4);
-
-    entity1.setEntity(entity);
-    entity1.setEntity2s(List.of(entity2));
-    entity1.setEntity3s(List.of(entity3));
-    entity1.setEntity4(entity4);
-
-    entity2.setEntity(entity);
-    entity2.setEntity3(entity3);
-
-    entity3.setEntity1s(List.of(entity1));
-    entity3.setEntity2s(List.of(entity2));
-
-    entity4.setEntity(entity);
-    entity4.setEntity1(entity1);
-  }
-
   @Test
   void testGetGenericTypeArgument() throws NoSuchFieldException {
-    final var field = this.getClass().getDeclaredField("entities");
+    // Then
+    final var field = Entity.class.getDeclaredField("entity1s");
+
+    // When
     final var genericTypeArgument = getGenericTypeArgument(field);
-    assertThat(genericTypeArgument).isEqualTo(Entity.class);
+
+    // Then
+    assertThat(genericTypeArgument).isEqualTo(Entity1.class);
   }
 
   @Test
   void testGetField() {
+    // Then
     final var fieldName = "name";
+
+    // When
     final var field = getField(Entity.class, fieldName);
+
+    // Then
     assertThat(field.getName()).isEqualTo(fieldName);
     assertThat(field.getType()).isEqualTo(String.class);
   }
 
   @Test
   void testGetFieldWhenFieldDoesNotExistThenThrows() {
+    // Given
     final var fieldName = "bazinga";
-    final var exception = assertThrows(
-        RuntimeException.class,
-        () -> getField(Entity.class, fieldName)
-    );
+
+    // When
+    final var executable = (Executable) () -> getField(Entity.class, fieldName);
+
+    // Then
+    final var exception = assertThrows(RuntimeException.class, executable);
     assertThat(exception.getCause()).isInstanceOf(NoSuchFieldException.class);
   }
 
@@ -96,7 +75,10 @@ class EntityUtilsTest {
       final Class<? extends Annotation> annotationClass,
       final List<Field> expectedFields
   ) {
+    // When
     final var fields = getFieldsAnnotatedWith(annotationClass, clazz);
+
+    // Then
     assertThat(fields).containsExactly(expectedFields.toArray(Field[]::new));
   }
 
@@ -129,28 +111,39 @@ class EntityUtilsTest {
 
   @Test
   void testGetFieldsMap() {
+    // Given
     final var fields = Entity.class.getDeclaredFields();
-    final var fieldsMap = getFieldsMap(fields, Field::getName);
     final var expectedFieldsMap = Arrays.stream(fields).collect(toMap(
         Field::getName,
         field -> field
     ));
+
+    // When
+    final var fieldsMap = getFieldsMap(fields, Field::getName);
+
+    // Then
     assertThat(fieldsMap).containsExactlyEntriesOf(expectedFieldsMap);
   }
 
   @Test
   void testGetTableName() {
-    final var tableName = getTableName(Entity.class);
+    // Given
     final var expectedTableName = Entity.class.getAnnotation(Table.class).value();
+
+    // When
+    final var tableName = getTableName(Entity.class);
+
+    // Then
     assertThat(tableName).isEqualTo(expectedTableName);
   }
 
   @Test
   void testGetTableNameWhenMissingAnnotationThenThrows() {
-    assertThrows(
-        MissingAnnotationException.class,
-        () -> getTableName(InvalidEntity.class)
-    );
+    // When
+    final var executable = (Executable) () -> getTableName(InvalidEntity.class);
+
+    // Then
+    assertThrows(MissingAnnotationException.class, executable);
   }
 
   @ParameterizedTest
@@ -159,7 +152,10 @@ class EntityUtilsTest {
       final Class<?> clazz,
       final String idFieldName
   ) throws NoSuchFieldException {
+    // When
     final var idColumn = getIdColumn(clazz);
+
+    // Then
     assertThat(idColumn).isEqualTo(clazz.getDeclaredField(idFieldName));
   }
 
@@ -174,38 +170,55 @@ class EntityUtilsTest {
 
   @Test
   void testGetIdColumnWhenIdColumnIsMissing() {
-    assertThrows(
-        MissingAnnotationException.class,
-        () -> getIdColumn(InvalidEntity.class)
-    );
+    // When
+    final var executable = (Executable) () -> getIdColumn(InvalidEntity.class);
+
+    // Then
+    assertThrows(MissingAnnotationException.class, executable);
   }
 
   @Test
   void testGetIdColumnNameByField() {
+    // Given
     final var field = getFieldsAnnotatedWith(Id.class, Entity.class)[0];
+
+    // When
     final var idColumnName = getIdColumnName(field);
+
+    // Then
     assertThat(idColumnName).isEqualTo(field.getName());
   }
 
   @Test
   void testGetIdColumnNameByClass() {
+    // Given
     final var field = getFieldsAnnotatedWith(Id.class, Entity.class)[0];
+
+    // When
     final var idColumnName = getIdColumnName(Entity.class);
+
+    // Then
     assertThat(idColumnName).isEqualTo(field.getName());
   }
 
   @Test
   void testGetIdColumnNameWhenAnnotationIsMissingThenThrows() {
-    assertThrows(
-        MissingAnnotationException.class,
-        () -> getIdColumnName(InvalidEntity.class)
-    );
+    // When
+    final var executable = (Executable) () -> getIdColumnName(InvalidEntity.class);
+
+    // Then
+    assertThrows(MissingAnnotationException.class, executable);
   }
 
   @Test
   void testGetColumns() {
+    // Given
     final var clazz = Entity.class;
+
+    // When
     final var columns = getColumns(clazz);
+
+    // Then
     assertThat(columns).containsExactly(concatenateArrays(
         Field.class,
         new Field[]{getIdColumn(clazz)},
@@ -217,99 +230,157 @@ class EntityUtilsTest {
 
   @Test
   void testGetColumnFields() {
-    final var columnFields = getColumnFields(Entity.class);
+    // Given
     final var expectedColumnFields = getFieldsAnnotatedWith(Column.class, Entity.class);
+
+    // When
+    final var columnFields = getColumnFields(Entity.class);
+
+    // Then
     assertThat(columnFields).containsExactly(expectedColumnFields);
   }
 
   @Test
   void testGetColumnName() throws NoSuchFieldException {
+    // Given
     final var expectedColumnName = "rank";
+
+    // When
     final var actualColumnName = getColumnName(Entity.class.getDeclaredField(expectedColumnName));
+
+    // Then
     assertThat(actualColumnName).isEqualTo(expectedColumnName);
   }
 
   @Test
   void testGetColumnNames() {
-    final var actualColumnNames = getColumnNames(Entity.class);
+    // Given
     final var expectedColumnNames = Arrays.stream(getColumns(Entity.class))
         .map(EntityUtils::getColumnName)
         .toArray(String[]::new);
+
+    // When
+    final var actualColumnNames = getColumnNames(Entity.class);
+
+    // Then
     assertThat(actualColumnNames).containsExactly(expectedColumnNames);
   }
 
   @Test
   void testGetJoinColumnName() throws NoSuchFieldException {
+    // Given
     final var field = Entity1.class.getDeclaredField("entity");
-    final var actualJoinColumnName = getJoinColumnName(field);
     final var expectedJoinColumnName = getAnnotation(field, JoinColumn.class).value();
+
+    // When
+    final var actualJoinColumnName = getJoinColumnName(field);
+
+    // Then
     assertThat(actualJoinColumnName).isEqualTo(expectedJoinColumnName);
   }
 
   @Test
   void testGetJoinColumnNameWhenFieldDoesNotContainJoinColumnThenThrows()
       throws NoSuchFieldException {
+    // Given
     final var field = Entity.class.getDeclaredField("rank");
-    assertThrows(
-        MissingAnnotationException.class,
-        () -> getJoinColumnName(field)
-    );
+
+    // When
+    final var executable = (Executable) () -> getJoinColumnName(field);
+
+    // Then
+    assertThrows(MissingAnnotationException.class, executable);
   }
 
   @Test
   void testGetColumnsMap() {
-    final var actualColumnsMap = getColumnsMap(Entity.class);
+    // Given
     final var expectedColumnsMap = getFieldsMap(
         getColumns(Entity.class),
         EntityUtils::getColumnName
     );
+
+    // When
+    final var actualColumnsMap = getColumnsMap(Entity.class);
+
+    // Then
     assertThat(actualColumnsMap).containsExactlyEntriesOf(expectedColumnsMap);
   }
 
   @Test
   void testGetOneToOneFields() {
-    final var actualOneToOneFields = getOneToOneFields(Entity.class);
+    // Given
     final var expectedOneToOneFields = getFieldsAnnotatedWith(OneToOne.class, Entity.class);
+
+    // When
+    final var actualOneToOneFields = getOneToOneFields(Entity.class);
+
+    // Then
     assertThat(actualOneToOneFields).containsExactly(expectedOneToOneFields);
   }
 
   @Test
   void testGetOneToManyFields() {
-    final var actualOneToManyFields = getOneToManyFields(Entity.class);
+    // Given
     final var expectedManyToOneFields = getFieldsAnnotatedWith(OneToMany.class, Entity.class);
+
+    // When
+    final var actualOneToManyFields = getOneToManyFields(Entity.class);
+
+    // Then
     assertThat(actualOneToManyFields).containsExactly(expectedManyToOneFields);
   }
 
   @Test
   void testGetManyToOneFields() {
-    final var actualManyToOneFields = getManyToOneFields(Entity2.class);
+    // Given
     final var expectedManyToOneFields = getFieldsAnnotatedWith(ManyToOne.class, Entity2.class);
+
+    // When
+    final var actualManyToOneFields = getManyToOneFields(Entity2.class);
+
+    // Then
     assertThat(actualManyToOneFields).containsExactly(expectedManyToOneFields);
   }
 
   @Test
   void testGetManyToManyFields() {
-    final var actualManyToManyFields = getManyToManyFields(Entity1.class);
+    // Given
     final var expectedManyToManyFields = getFieldsAnnotatedWith(ManyToMany.class, Entity1.class);
+
+    // When
+    final var actualManyToManyFields = getManyToManyFields(Entity1.class);
+
+    // Then
     assertThat(actualManyToManyFields).containsExactly(expectedManyToManyFields);
   }
 
   @Test
   void testGetRelationalField() throws NoSuchFieldException {
+    // Given
+    final var expectedRelationalField = Entity.class.getDeclaredField("entity2s");
+
+    // When
     final var actualRelationalField = getRelationalField(
         Entity.class,
         Entity2.class,
         OneToMany.class
     );
-    final var expectedRelationalField = Entity.class.getDeclaredField("entity2s");
+
+    // Then
     assertThat(actualRelationalField).isEqualTo(expectedRelationalField);
   }
 
   @Test
   void testGetTargetEntityByField() throws NoSuchFieldException {
+    // Given
     final var field = Entity.class.getDeclaredField("entity1s");
-    final var actualTargetEntity = getTargetEntity(field);
     final var expectedTargetEntity = Entity1.class;
+
+    // When
+    final var actualTargetEntity = getTargetEntity(field);
+
+    // Then
     assertThat(actualTargetEntity).isEqualTo(expectedTargetEntity);
   }
 
@@ -318,14 +389,17 @@ class EntityUtilsTest {
   <A extends Annotation> void testGetTargetEntityByFieldOrAnnotation(
       final Field field,
       final Class<A> annotationClass,
-      final TargetEntitySupplier<A> targetEntitySupplier,
+      final Function<A, Class<?>> targetEntitySupplier,
       final Class<?> expectedTargetEntity
   ) {
+    // When
     final var actualTargetEntity = getTargetEntity(
         field,
         annotationClass,
-        targetEntitySupplier.get()
+        targetEntitySupplier
     );
+
+    // Then
     assertThat(actualTargetEntity).isEqualTo(expectedTargetEntity);
   }
 
@@ -335,37 +409,37 @@ class EntityUtilsTest {
         arguments(
             Entity.class.getDeclaredField("entity1s"),
             OneToMany.class,
-            TargetEntitySupplier.of(OneToMany::targetEntity),
+            Function.of(OneToMany::targetEntity),
             Entity1.class
         ),
         arguments(
             Entity.class.getDeclaredField("entity2s"),
             OneToMany.class,
-            TargetEntitySupplier.of(OneToMany::targetEntity),
+            Function.of(OneToMany::targetEntity),
             Entity2.class
         ),
         arguments(
             Entity1.class.getDeclaredField("entity2s"),
             ManyToMany.class,
-            TargetEntitySupplier.of(ManyToMany::targetEntity),
+            Function.of(ManyToMany::targetEntity),
             Entity2.class
         ),
         arguments(
             Entity1.class.getDeclaredField("entity3s"),
             ManyToMany.class,
-            TargetEntitySupplier.of(ManyToMany::targetEntity),
+            Function.of(ManyToMany::targetEntity),
             Entity3.class
         ),
         arguments(
             Entity2.class.getDeclaredField("entity"),
             ManyToOne.class,
-            TargetEntitySupplier.of(ManyToOne::targetEntity),
+            Function.of(ManyToOne::targetEntity),
             Entity.class
         ),
         arguments(
             Entity2.class.getDeclaredField("entity3"),
             ManyToOne.class,
-            TargetEntitySupplier.of(ManyToOne::targetEntity),
+            Function.of(ManyToOne::targetEntity),
             Entity3.class
         )
     );
@@ -377,7 +451,10 @@ class EntityUtilsTest {
       final Field field,
       final Object expectedType
   ) {
+    // When
     final var actualType = getObjectOrCollectionType(field);
+
+    // Then
     assertThat(actualType).isEqualTo(expectedType);
   }
 
@@ -413,8 +490,13 @@ class EntityUtilsTest {
       final Field field,
       final Class<A> annotationClass
   ) {
-    final var actualAnnotation = getAnnotation(field, annotationClass);
+    // Given
     final var expectedAnnotation = field.getAnnotation(annotationClass);
+
+    // When
+    final var actualAnnotation = getAnnotation(field, annotationClass);
+
+    // Then
     assertThat(actualAnnotation).isEqualTo(expectedAnnotation);
   }
 
@@ -437,8 +519,13 @@ class EntityUtilsTest {
       final Field manyToManyField,
       final Field expectedFieldHavingJoinTable
   ) {
-    final var actualJoinTable = getJoinTable(manyToManyField);
+    // Given
     final var expectedJoinTable = getAnnotation(expectedFieldHavingJoinTable, JoinTable.class);
+
+    // When
+    final var actualJoinTable = getJoinTable(manyToManyField);
+
+    // Then
     assertThat(actualJoinTable).isEqualTo(expectedJoinTable);
   }
 
@@ -456,7 +543,10 @@ class EntityUtilsTest {
   @ParameterizedTest
   @MethodSource("paramsForGetJoinTableName")
   void testGetJoinTableName(final Field field, final String expectedJoinTableName) {
+    // When
     final var actualJoinTableName = getJoinTableName(field);
+
+    // Then
     assertThat(actualJoinTableName).isEqualTo(expectedJoinTableName);
   }
 
@@ -472,12 +562,17 @@ class EntityUtilsTest {
   @ParameterizedTest
   @MethodSource("paramsForGetJoinTableColumnName")
   void testGetJoinTableColumnName(final Class<?> clazz) {
-    final var actualJoinTableColumnName = generateJoinTableColumnName(clazz);
+    // Given
     final var expectedJoinTableColumnName = String.format(
         "%s_%s",
         getTableName(clazz),
         getIdColumnName(clazz)
     );
+
+    // When
+    final var actualJoinTableColumnName = generateJoinTableColumnName(clazz);
+
+    // Then
     assertThat(actualJoinTableColumnName).isEqualTo(expectedJoinTableColumnName);
   }
 
@@ -494,12 +589,17 @@ class EntityUtilsTest {
   @ParameterizedTest
   @MethodSource("paramsForGetEntityJoinColumnName")
   void testGetEntityJoinColumnName(final Field field, final Class<?> clazz) {
+    // Given
     final var joinTable = getJoinTable(field);
     final var joinColumn = joinTable.joinColumn();
-    final var actualEntityJoinColumnName = getEntityJoinColumnName(clazz, joinColumn);
     final var expectedEntityJoinColumnName = joinColumn.value().isEmpty()
         ? generateJoinTableColumnName(clazz)
         : joinColumn.value();
+
+    // When
+    final var actualEntityJoinColumnName = getEntityJoinColumnName(clazz, joinColumn);
+
+    // Then
     assertThat(actualEntityJoinColumnName).isEqualTo(expectedEntityJoinColumnName);
   }
 
@@ -517,7 +617,10 @@ class EntityUtilsTest {
   @ParameterizedTest
   @MethodSource("paramsForGetToManyFields")
   void testGetToManyFields(final Class<?> clazz, final Field[] expectedToManyFields) {
+    // When
     final var actualToManyFields = getToManyFields(clazz);
+
+    // Then
     assertThat(actualToManyFields).containsExactlyInAnyOrder(expectedToManyFields);
   }
 
@@ -547,11 +650,19 @@ class EntityUtilsTest {
       final Object entity,
       final Object expectedColumnValue
   ) {
-    final Object actualColumnValue = getColumnValue(field, entity);
+    // When
+    final var actualColumnValue = getColumnValue(field, entity);
+
+    // Then
     assertThat(actualColumnValue).isEqualTo(expectedColumnValue);
   }
 
   private static Stream<Arguments> paramsForGetColumnValue() throws NoSuchFieldException {
+    final var entity = getEntity(1, "SomeEntity", 5);
+    final var entity1 = getEntity1(10, "SomeEntity1", 6);
+    final var entity2 = getEntity2(20, "SomeEntity2", 7);
+    final var entity3 = getEntity3(30, "SomeEntity3", 8);
+    final var entity4 = getEntity4(40, "SomeEntity4", 9);
     return Stream.of(
         arguments(Entity.class.getDeclaredField("id"), entity, entity.getId()),
         arguments(Entity.class.getDeclaredField("name"), entity, entity.getName()),
@@ -585,11 +696,38 @@ class EntityUtilsTest {
       final Class<?> clazz,
       final Object[] expectedColumnValues
   ) {
-    final Object[] actualColumnValues = getColumnValues(entity, clazz);
+    // When
+    final var actualColumnValues = getColumnValues(entity, clazz);
+
+    // Then
     assertThat(actualColumnValues).containsExactly(expectedColumnValues);
   }
 
   private static Stream<Arguments> paramsForGetColumnValues() {
+    final var entity = getEntity(1, "SomeEntity", 5);
+    final var entity1 = getEntity1(10, "SomeEntity1", 6);
+    final var entity2 = getEntity2(20, "SomeEntity2", 7);
+    final var entity3 = getEntity3(30, "SomeEntity3", 8);
+    final var entity4 = getEntity4(40, "SomeEntity4", 9);
+
+    entity.setEntity1s(List.of(entity1));
+    entity.setEntity2s(List.of(entity2));
+    entity.setEntity4(entity4);
+
+    entity1.setEntity(entity);
+    entity1.setEntity2s(List.of(entity2));
+    entity1.setEntity3s(List.of(entity3));
+    entity1.setEntity4(entity4);
+
+    entity2.setEntity(entity);
+    entity2.setEntity3(entity3);
+
+    entity3.setEntity1s(List.of(entity1));
+    entity3.setEntity2s(List.of(entity2));
+
+    entity4.setEntity(entity);
+    entity4.setEntity1(entity1);
+
     return Stream.of(
         arguments(entity, Entity.class, new Object[]{
             entity.getId(),
@@ -631,40 +769,67 @@ class EntityUtilsTest {
   void testGetColumnValuesAsStringForSQL(
       final Object entity,
       final Class<?> clazz,
-      final Object[] expectedColumnValues
+      final String[] expectedColumnValues
   ) {
-    final Object[] actualColumnValues = getColumnValuesAsStringForSQL(entity, clazz);
+    // When
+    final var actualColumnValues = getColumnValuesAsStringForSQL(entity, clazz);
+
+    // Then
     assertThat(actualColumnValues).containsExactly(expectedColumnValues);
   }
 
   private static Stream<Arguments> paramsForGetColumnValuesAsStringForSQL() {
+    final var entity = getEntity(1, "SomeEntity", 5);
+    final var entity1 = getEntity1(10, "SomeEntity1", 6);
+    final var entity2 = getEntity2(20, "SomeEntity2", 7);
+    final var entity3 = getEntity3(30, "SomeEntity3", 8);
+    final var entity4 = getEntity4(40, "SomeEntity4", 9);
+
+    entity.setEntity1s(List.of(entity1));
+    entity.setEntity2s(List.of(entity2));
+    entity.setEntity4(entity4);
+
+    entity1.setEntity(entity);
+    entity1.setEntity2s(List.of(entity2));
+    entity1.setEntity3s(List.of(entity3));
+    entity1.setEntity4(entity4);
+
+    entity2.setEntity(entity);
+    entity2.setEntity3(entity3);
+
+    entity3.setEntity1s(List.of(entity1));
+    entity3.setEntity2s(List.of(entity2));
+
+    entity4.setEntity(entity);
+    entity4.setEntity1(entity1);
+
     return Stream.of(
-        arguments(entity, Entity.class, new Object[]{
+        arguments(entity, Entity.class, new String[]{
             getStringValueForSql(entity.getId()),
             getStringValueForSql(entity.getName()),
             getStringValueForSql(entity.getRank()),
             getStringValueForSql(entity.getEntity4().getId())
         }),
-        arguments(entity1, Entity1.class, new Object[]{
+        arguments(entity1, Entity1.class, new String[]{
             getStringValueForSql(entity1.getId()),
             getStringValueForSql(entity1.getName()),
             getStringValueForSql(entity1.getRank()),
             getStringValueForSql(entity1.getEntity().getId()),
             getStringValueForSql(entity1.getEntity4().getId())
         }),
-        arguments(entity2, Entity2.class, new Object[]{
+        arguments(entity2, Entity2.class, new String[]{
             getStringValueForSql(entity2.getId()),
             getStringValueForSql(entity2.getName()),
             getStringValueForSql(entity2.getRank()),
             getStringValueForSql(entity2.getEntity().getId()),
             getStringValueForSql(entity2.getEntity3().getId())
         }),
-        arguments(entity3, Entity3.class, new Object[]{
+        arguments(entity3, Entity3.class, new String[]{
             getStringValueForSql(entity3.getId()),
             getStringValueForSql(entity3.getName()),
             getStringValueForSql(entity3.getRank())
         }),
-        arguments(entity4, Entity4.class, new Object[]{
+        arguments(entity4, Entity4.class, new String[]{
             getStringValueForSql(entity4.getId()),
             getStringValueForSql(entity4.getName()),
             getStringValueForSql(entity4.getRank()),
@@ -676,15 +841,23 @@ class EntityUtilsTest {
 
   @Test
   void testGetIdColumnValue() {
+    // Given
     final var entity = getEntity(1, "SomeEntity", 5);
+
+    // When
     final var actualIdColumnValue = getIdColumnValue(entity);
+
+    // Then
     assertThat(actualIdColumnValue).isEqualTo(entity.getId());
   }
 
   @ParameterizedTest
   @MethodSource("paramsForGetStringValueForSql")
   void testGetStringValueForSql(final Object value, final String expectedValue) {
+    // When
     final var stringValue = getStringValueForSql(value);
+
+    // Then
     assertThat(stringValue).isEqualTo(expectedValue);
   }
 
@@ -701,10 +874,11 @@ class EntityUtilsTest {
   @ParameterizedTest
   @MethodSource("paramsForGetStringValueForSqlWhenInvalidTypeThenThrow")
   void testGetStringValueForSqlWhenInvalidTypeThenThrow(final Object value) {
-    assertThrows(
-        InvalidColumnTypeException.class,
-        () -> getStringValueForSql(value)
-    );
+    // When
+    final var executable = (Executable) () -> getStringValueForSql(value);
+
+    // Then
+    assertThrows(InvalidColumnTypeException.class, executable);
   }
 
   @SuppressWarnings("PrimitiveArrayArgumentToVarargsMethod")

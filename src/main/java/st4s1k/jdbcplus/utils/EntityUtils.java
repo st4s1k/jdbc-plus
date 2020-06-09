@@ -234,7 +234,7 @@ public class EntityUtils {
   }
 
   public static String getJoinTableName(final Field field) {
-    return getAnnotation(field, JoinTable.class).value();
+    return getAnnotation(field, JoinTable.class).name();
   }
 
   public static String generateJoinTableColumnName(final Class<?> entityClass) {
