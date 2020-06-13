@@ -18,7 +18,6 @@ import java.lang.reflect.Field;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -88,7 +87,7 @@ class AbstractJdbcPlusRepositoryTest {
 
     // Then
     assertThat(result).isEqualTo(
-        "delete from %s where id = %d returning *",
+        "delete from %s where id = %d",
         tableName,
         entity.getId()
     );
@@ -99,7 +98,7 @@ class AbstractJdbcPlusRepositoryTest {
     // Given
     final var tableName = getTableName(entity.getClass());
     final var expectedStringTemplate = "insert into %s(id, name, rank, entity4) " +
-        "values (%d, '%s', %d, %d) returning *";
+        "values (%d, '%s', %d, %d)";
 
     // When
     final var result = abstractJdbcPlusRepository.sqlInsert(entity);
@@ -121,7 +120,7 @@ class AbstractJdbcPlusRepositoryTest {
     final var tableName = getTableName(entity.getClass());
     final var expectedStringTemplate = "update %s " +
         "set name = '%s', rank = %d, entity4 = %d " +
-        "where id = %d returning *";
+        "where id = %d";
 
     // When
     final var result = abstractJdbcPlusRepository.sqlUpdate(entity);
@@ -251,17 +250,25 @@ class AbstractJdbcPlusRepositoryTest {
   @Test
   void testSave() {
     // Given
-    final var expectedQuery = abstractJdbcPlusRepository.sqlInsert(entity);
+    final var expectedInsertQuery = abstractJdbcPlusRepository.sqlInsert(entity);
+    final var expectedSelectQuery = abstractJdbcPlusRepository.sqlSelectAllByColumn(
+        getTableName(entity.getClass()),
+        getIdColumnName(entity.getClass()),
+        getIdColumnValue(entity)
+    );
 
     // When
     abstractJdbcPlusRepository.save(entity);
 
     // Then
-    verify(databaseConnection).queryTransaction(eq(expectedQuery), any(), any());
+    final var inOrder = inOrder(databaseConnection);
+    inOrder.verify(databaseConnection).queryTransaction(eq(expectedSelectQuery), any(), any());
+    inOrder.verify(databaseConnection).queryTransaction(eq(expectedInsertQuery));
+    inOrder.verify(databaseConnection).queryTransaction(eq(expectedSelectQuery), any(), any());
   }
 
   @Test
-  void testUpdate() {
+  void testSaveWhenEntityAlreadyExists() {
     // Given
     final var tableName = getTableName(entity.getClass());
     final var selectQuery = abstractJdbcPlusRepository.sqlSelectAllByColumn(
@@ -273,15 +280,15 @@ class AbstractJdbcPlusRepositoryTest {
 
     when(databaseConnection.queryTransaction(eq(selectQuery), any(), any()))
         .thenReturn(List.of(entity));
-    when(databaseConnection.queryTransaction(eq(expectedQuery), any()))
-        .thenReturn(Optional.of(entity));
 
     // When
-    abstractJdbcPlusRepository.update(entity);
+    abstractJdbcPlusRepository.save(entity);
 
     // Then
-    verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());
-    verify(databaseConnection).queryTransaction(eq(expectedQuery), any());
+    final var inOrder = inOrder(databaseConnection);
+    inOrder.verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());
+    inOrder.verify(databaseConnection).queryTransaction(eq(expectedQuery));
+    inOrder.verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());
   }
 
   @Test
@@ -297,15 +304,13 @@ class AbstractJdbcPlusRepositoryTest {
 
     when(databaseConnection.queryTransaction(eq(selectQuery), any(), any()))
         .thenReturn(List.of(entity));
-    when(databaseConnection.queryTransaction(eq(expectedQuery), any()))
-        .thenReturn(Optional.of(entity));
 
     // When
     abstractJdbcPlusRepository.remove(entity);
 
     // Then
     verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());
-    verify(databaseConnection).queryTransaction(eq(expectedQuery), any());
+    verify(databaseConnection).queryTransaction(eq(expectedQuery));
   }
 
   @Test
@@ -320,7 +325,7 @@ class AbstractJdbcPlusRepositoryTest {
     final var expectedQuery = abstractJdbcPlusRepository.sqlSelectAllByColumns(
         tableName,
         getColumnNames(Entity.class),
-        getColumnValues(entity, Entity.class)
+        getColumnValues(entity)
     );
     verify(databaseConnection).queryTransaction(eq(expectedQuery), any(), any());
   }
@@ -440,7 +445,7 @@ class AbstractJdbcPlusRepositoryTest {
         .thenReturn(List.of(entity.getEntity4()));
 
     // When
-    abstractJdbcPlusRepository.populateColumnFields(entityResultSet, newEntity, Entity.class);
+    abstractJdbcPlusRepository.populateColumnFields(entityResultSet, newEntity);
 
     // Then
     assertEntitiesAreEqualByColumnValues(newEntity, entity);
@@ -521,8 +526,7 @@ class AbstractJdbcPlusRepositoryTest {
     // When
     abstractJdbcPlusRepository.populateOneToManyField(
         declaredField,
-        entity,
-        Entity.class
+        entity
     );
 
     // Then

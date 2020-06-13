@@ -3,6 +3,7 @@ package st4s1k.jdbcplus.utils;
 import st4s1k.jdbcplus.annotations.*;
 import st4s1k.jdbcplus.exceptions.InvalidColumnTypeException;
 import st4s1k.jdbcplus.exceptions.InvalidMappingException;
+import st4s1k.jdbcplus.exceptions.JdbcPlusException;
 import st4s1k.jdbcplus.exceptions.MissingAnnotationException;
 
 import java.lang.annotation.Annotation;
@@ -36,7 +37,8 @@ public class EntityUtils {
       return clazz.getDeclaredField(fieldName);
     } catch (NoSuchFieldException e) {
       final String message = String.format("No such field field %s#%s", clazz.getName(), fieldName);
-      throw new RuntimeException(message, e);
+      LOGGER.log(ERROR, message, e);
+      throw new JdbcPlusException(e);
     }
   }
 
@@ -52,8 +54,8 @@ public class EntityUtils {
   }
 
   public static Map<String, Field> getFieldsMap(
-      final Field[] fields,
-      final Function<Field, String> keyGenerator
+      final Function<Field, String> keyGenerator,
+      final Field[] fields
   ) {
     return Arrays.stream(fields).collect(toMap(keyGenerator, field -> field));
   }
@@ -134,7 +136,15 @@ public class EntityUtils {
   }
 
   public static Map<String, Field> getColumnsMap(final Class<?> clazz) {
-    return getFieldsMap(getColumns(clazz), EntityUtils::getColumnName);
+    return getFieldsMap(EntityUtils::getColumnName, getColumns(clazz));
+  }
+
+  public static <T> Map<String, Object> getColumnsNameValueMap(final T entity) {
+    return Stream.of(getColumns(entity.getClass()))
+        .collect(toMap(
+            Field::getName,
+            field -> getStringValueForSql(field, entity)
+        ));
   }
 
   public static Field[] getOneToOneFields(final Class<?> clazz) {
@@ -292,7 +302,7 @@ public class EntityUtils {
         return field.get(entity);
       } catch (IllegalAccessException e) {
         LOGGER.log(ERROR, e.getLocalizedMessage(), e);
-        return null;
+        throw new JdbcPlusException(e);
       }
     } else {
       throw new MissingAnnotationException(
@@ -304,11 +314,8 @@ public class EntityUtils {
     }
   }
 
-  public static <T> Object[] getColumnValues(
-      final T entity,
-      final Class<?> clazz
-  ) {
-    return Arrays.stream(getColumns(clazz))
+  public static <T> Object[] getColumnValues(final T entity) {
+    return Arrays.stream(getColumns(entity.getClass()))
         .map(f -> getColumnValue(f, entity))
         .toArray();
   }
@@ -330,7 +337,7 @@ public class EntityUtils {
       return idColumn.get(entity);
     } catch (IllegalAccessException e) {
       LOGGER.log(ERROR, e.getLocalizedMessage(), e);
-      return null;
+      throw new JdbcPlusException(e);
     }
   }
 
@@ -351,5 +358,12 @@ public class EntityUtils {
     } else {
       throw new InvalidColumnTypeException();
     }
+  }
+
+  public static String getStringValueForSql(
+      final Field field,
+      final Object entity
+  ) {
+    return getStringValueForSql(getColumnValueOrId(field, entity));
   }
 }

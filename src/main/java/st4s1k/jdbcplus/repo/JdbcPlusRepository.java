@@ -46,7 +46,7 @@ public abstract class JdbcPlusRepository<T> {
    * @return {@link Optional} updated entity
    */
   public Optional<T> update(final T entity) {
-    return abstractJdbcPlusRepository.update(entity);
+    return abstractJdbcPlusRepository.save(entity);
   }
 
   /**

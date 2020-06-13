@@ -27,8 +27,8 @@ public class TestUtils {
       final Entity entity1,
       final Entity entity2
   ) {
-    final var entity1ColumnValues = getColumnValues(entity1, Entity.class);
-    final var entity2ColumnValues = getColumnValues(entity2, Entity.class);
+    final var entity1ColumnValues = getColumnValues(entity1);
+    final var entity2ColumnValues = getColumnValues(entity2);
     assertThat(entity1ColumnValues).containsExactly(entity2ColumnValues);
   }
 

@@ -65,7 +65,7 @@ class JdbcPlusRepositoryTest {
     jdbcPlusRepository.update(entity);
 
     // Then
-    verify(abstractJdbcPlusRepository).update(entity);
+    verify(abstractJdbcPlusRepository).save(entity);
   }
 
   @Test

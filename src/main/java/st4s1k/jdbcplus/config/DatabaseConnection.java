@@ -2,6 +2,7 @@ package st4s1k.jdbcplus.config;
 
 import st4s1k.jdbcplus.exceptions.InstanceAlreadyInitializedException;
 import st4s1k.jdbcplus.exceptions.InstanceNotInitializedException;
+import st4s1k.jdbcplus.function.ConnectionConsumer;
 import st4s1k.jdbcplus.function.ConnectionFunction;
 
 import javax.sql.DataSource;
@@ -71,6 +72,20 @@ public class DatabaseConnection {
     );
   }
 
+  public void queryTransaction(final String query) {
+    applyConnection(
+        connection -> {
+          try (final Statement statement = connection.createStatement()) {
+            statement.executeUpdate(query);
+            connection.commit();
+          } catch (final Exception e) {
+            logger.log(ERROR, e.getLocalizedMessage(), e);
+            connection.rollback();
+          }
+        }
+    );
+  }
+
   public <T> Optional<T> queryTransaction(
       final String query,
       final Function<ResultSet, T> operation
@@ -92,6 +107,15 @@ public class DatabaseConnection {
     } catch (final SQLException e) {
       logger.log(ERROR, e.getLocalizedMessage(), e);
       return defaultResult.get();
+    }
+  }
+
+  private void applyConnection(final ConnectionConsumer connectionFunction) {
+    try (final Connection connection = dataSource.getConnection()) {
+      connection.setAutoCommit(false);
+      connectionFunction.accept(connection);
+    } catch (final SQLException e) {
+      logger.log(ERROR, e.getLocalizedMessage(), e);
     }
   }
 }

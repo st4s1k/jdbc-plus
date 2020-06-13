@@ -119,7 +119,7 @@ class EntityUtilsTest {
     ));
 
     // When
-    final var fieldsMap = getFieldsMap(fields, Field::getName);
+    final var fieldsMap = getFieldsMap(Field::getName, fields);
 
     // Then
     assertThat(fieldsMap).containsExactlyEntriesOf(expectedFieldsMap);
@@ -296,8 +296,7 @@ class EntityUtilsTest {
   void testGetColumnsMap() {
     // Given
     final var expectedColumnsMap = getFieldsMap(
-        getColumns(Entity.class),
-        EntityUtils::getColumnName
+        EntityUtils::getColumnName, getColumns(Entity.class)
     );
 
     // When
@@ -697,7 +696,7 @@ class EntityUtilsTest {
       final Object[] expectedColumnValues
   ) {
     // When
-    final var actualColumnValues = getColumnValues(entity, clazz);
+    final var actualColumnValues = getColumnValues(entity);
 
     // Then
     assertThat(actualColumnValues).containsExactly(expectedColumnValues);

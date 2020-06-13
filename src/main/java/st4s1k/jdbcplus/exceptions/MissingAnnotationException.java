@@ -4,7 +4,8 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 
-public class MissingAnnotationException extends RuntimeException {
+public class MissingAnnotationException extends JdbcPlusException {
+
   @SafeVarargs
   public MissingAnnotationException(
       final Field field,

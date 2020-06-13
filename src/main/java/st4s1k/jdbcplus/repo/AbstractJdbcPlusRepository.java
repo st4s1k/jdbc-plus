@@ -4,6 +4,7 @@ import st4s1k.jdbcplus.annotations.*;
 import st4s1k.jdbcplus.config.DatabaseConnection;
 import st4s1k.jdbcplus.exceptions.InvalidMappingException;
 import st4s1k.jdbcplus.exceptions.InvalidResultSetException;
+import st4s1k.jdbcplus.exceptions.JdbcPlusException;
 
 import java.lang.reflect.Field;
 import java.sql.ResultSet;
@@ -11,6 +12,7 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static java.lang.System.Logger;
 import static java.lang.System.Logger.Level.ERROR;
@@ -43,8 +45,8 @@ public class AbstractJdbcPlusRepository {
   }
 
   @SuppressWarnings("unchecked")
-  public <X> Class<X> getGenerifiedClass(final X entity) {
-    return (Class<X>) entity.getClass();
+  public <T> Class<T> getGenerifiedClass(final T entity) {
+    return (Class<T>) entity.getClass();
   }
 
   /**
@@ -53,13 +55,13 @@ public class AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return SQL query string
    */
-  public <X> String sqlRemove(final X entity) {
+  public <T> String sqlRemove(final T entity) {
     final Class<?> clazz = entity.getClass();
     final String table = getTableName(clazz);
     final String id = getIdColumnName(clazz);
     final Object idColumnValue = getIdColumnValue(entity);
     final String value = getStringValueForSql(idColumnValue);
-    return String.format("delete from %s where %s = %s returning *", table, id, value);
+    return String.format("delete from %s where %s = %s", table, id, value);
   }
 
   /**
@@ -68,24 +70,14 @@ public class AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return SQL query string
    */
-  public <X> String sqlInsert(final X entity) {
+  public <T> String sqlInsert(final T entity) {
     final Class<?> clazz = entity.getClass();
     final String table = getTableName(clazz);
-    final StringBuilder columns = new StringBuilder();
-    final StringBuilder values = new StringBuilder();
     final String[] fieldNames = getColumnNames(clazz);
     final String[] fieldValues = getColumnValuesAsStringForSQL(entity, clazz);
-    for (int i = 0; i < fieldNames.length; i++) {
-      if (Optional.ofNullable(fieldValues[i]).isPresent()) {
-        if (columns.length() > 0) {
-          columns.append(", ");
-          values.append(", ");
-        }
-        columns.append(fieldNames[i]);
-        values.append(fieldValues[i]);
-      }
-    }
-    return String.format("insert into %s(%s) values (%s) returning *", table, columns, values);
+    final String columns = String.join(", ", fieldNames);
+    final String values = String.join(", ", fieldValues);
+    return String.format("insert into %s(%s) values (%s)", table, columns, values);
   }
 
   /**
@@ -94,27 +86,19 @@ public class AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return SQL query string
    */
-  public <X> String sqlUpdate(final X entity) {
+  public <T> String sqlUpdate(final T entity) {
     final Class<?> clazz = entity.getClass();
     final String table = getTableName(clazz);
     final String idColumnName = getIdColumnName(clazz);
     final Object idValue = getIdColumnValue(entity);
     final String idStringValue = getStringValueForSql(idValue);
-    final String[] fieldNames = getColumnNames(clazz);
-    final String[] fieldValues = getColumnValuesAsStringForSQL(entity, clazz);
-    final StringBuilder columns = new StringBuilder();
-    for (int i = 0; i < fieldNames.length; i++) {
-      if (fieldNames[i].equals(idColumnName)) {
-        continue;
-      }
-      if (columns.length() > 0) {
-        columns.append(", ");
-      }
-      columns.append(fieldNames[i]).append(" = ").append(fieldValues[i]);
-    }
+    final String columns = getColumnsNameValueMap(entity).entrySet().stream()
+        .filter(not(e -> e.getKey().equals(idColumnName)))
+        .map(e -> e.getKey() + " = " + e.getValue())
+        .collect(Collectors.joining(", "));
     return columns.length() == 0 ? "" :
         String.format(
-            "update %s set %s where %s = %s returning *",
+            "update %s set %s where %s = %s",
             table,
             columns,
             idColumnName,
@@ -181,33 +165,18 @@ public class AbstractJdbcPlusRepository {
   }
 
   /**
-   * Create a row in the table associated with the entity.
+   * Create, or Update, a row in the table associated with the entity.
    *
    * @param entity the entity
    * @return {@link Optional} saved entity
    */
-  public <X> Optional<X> save(final X entity) {
-    final Class<X> aClass = getGenerifiedClass(entity);
-    return databaseConnection.queryTransaction(
-        sqlInsert(entity),
-        resultSet -> Optional.ofNullable(getObject(resultSet, aClass)),
-        Optional::empty
-    );
-  }
-
-  /**
-   * Update a row in the table associated with the entity.
-   *
-   * @param entity the entity
-   * @return {@link Optional} updated entity
-   */
-  public <X> Optional<X> update(final X entity) {
-    final Class<X> clazz = getGenerifiedClass(entity);
-    return findById(getIdColumnValue(entity), clazz)
-        .flatMap(e -> databaseConnection.queryTransaction(
-            sqlUpdate(e),
-            resultSet -> getObject(resultSet, clazz)
-        ));
+  public <T> Optional<T> save(final T entity) {
+    findById(entity)
+        .ifPresentOrElse(
+            e -> databaseConnection.queryTransaction(sqlUpdate(e)),
+            () -> databaseConnection.queryTransaction(sqlInsert(entity))
+        );
+    return findById(entity);
   }
 
   /**
@@ -216,13 +185,10 @@ public class AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return {@link Optional} removed entity
    */
-  public <X> Optional<X> remove(final X entity) {
-    final Class<X> clazz = getGenerifiedClass(entity);
-    return findById(getIdColumnValue(entity), clazz)
-        .flatMap(e -> databaseConnection.queryTransaction(
-            sqlRemove(e),
-            resultSet -> getObject(resultSet, clazz)
-        ));
+  public <T> Optional<T> remove(final T entity) {
+    final Optional<T> foundEntity = findById(entity);
+    foundEntity.ifPresent(e -> databaseConnection.queryTransaction(sqlRemove(e)));
+    return foundEntity;
   }
 
   /**
@@ -231,16 +197,16 @@ public class AbstractJdbcPlusRepository {
    * @param entity the entity
    * @return a list of found entities
    */
-  public <X> List<X> find(final X entity) {
+  public <T> List<T> find(final T entity) {
     return Optional.ofNullable(entity)
         .map(e -> databaseConnection.queryTransaction(
             sqlSelectAllByColumns(
-                getTableName(getGenerifiedClass(entity)),
-                getColumnNames(getGenerifiedClass(entity)),
-                getColumnValues(entity, getGenerifiedClass(entity))
+                getTableName(entity.getClass()),
+                getColumnNames(entity.getClass()),
+                getColumnValues(entity)
             ),
             resultSet -> getObjects(resultSet, getGenerifiedClass(entity)),
-            Collections::<X>emptyList
+            Collections::<T>emptyList
         ))
         .orElse(emptyList());
   }
@@ -250,7 +216,7 @@ public class AbstractJdbcPlusRepository {
    *
    * @return a list of found entities
    */
-  public <X> List<X> findAll(final Class<X> clazz) {
+  public <T> List<T> findAll(final Class<T> clazz) {
     return databaseConnection.queryTransaction(
         sqlSelectAll(getTableName(clazz)),
         resultSet -> getObjects(resultSet, clazz),
@@ -266,20 +232,16 @@ public class AbstractJdbcPlusRepository {
    * @param value  specified value
    * @return a list of found entities
    */
-  public <X> List<X> findByColumn(
+  public <T> List<T> findByColumn(
       final String column,
       final Object value,
-      final Class<X> clazz
+      final Class<T> clazz
   ) {
     return Optional.ofNullable(column)
         .map(field -> databaseConnection.queryTransaction(
-            sqlSelectAllByColumn(
-                getTableName(clazz),
-                field,
-                value
-            ),
+            sqlSelectAllByColumn(getTableName(clazz), field, value),
             resultSet -> getObjects(resultSet, clazz),
-            Collections::<X>emptyList
+            Collections::<T>emptyList
         ))
         .orElse(emptyList());
   }
@@ -287,15 +249,29 @@ public class AbstractJdbcPlusRepository {
   /**
    * Find entity by id and given Class.
    *
-   * @param id    entity id
-   * @param clazz entity class
+   * @param idValue entity id
+   * @param clazz   entity class
    * @return {@link Optional} found entity
    */
   public <X> Optional<X> findById(
-      final Object id,
+      final Object idValue,
       final Class<X> clazz
   ) {
-    final List<X> entityList = findByColumn(getIdColumnName(clazz), id, clazz);
+    final List<X> entityList = findByColumn(getIdColumnName(clazz), idValue, clazz);
+    return entityList.stream().findFirst();
+  }
+
+  /**
+   * Find entity by id.
+   *
+   * @param entity entity
+   * @return {@link Optional} found entity
+   */
+  public <T> Optional<T> findById(final T entity) {
+    final Class<T> clazz = getGenerifiedClass(entity);
+    final String idColumnName = getIdColumnName(clazz);
+    final Object idColumnValue = getIdColumnValue(entity);
+    final List<T> entityList = findByColumn(idColumnName, idColumnValue, clazz);
     return Optional.ofNullable(entityList)
         .filter(not(List::isEmpty))
         .filter(list -> list.size() == 1)
@@ -309,12 +285,12 @@ public class AbstractJdbcPlusRepository {
    * @param clazz     entity class object
    * @return extracted entity
    */
-  public <X> X getObject(
+  public <T> T getObject(
       final ResultSet resultSet,
-      final Class<X> clazz
+      final Class<T> clazz
   ) {
-    final X entity = getClassInstance(clazz);
-    populateColumnFields(resultSet, entity, clazz);
+    final T entity = getClassInstance(clazz);
+    populateColumnFields(resultSet, entity);
     return entity;
   }
 
@@ -325,11 +301,11 @@ public class AbstractJdbcPlusRepository {
    * @param clazz     entity class object
    * @return a list of extracted entities
    */
-  public <X> List<X> getObjects(
+  public <T> List<T> getObjects(
       final ResultSet resultSet,
-      final Class<X> clazz
+      final Class<T> clazz
   ) {
-    final List<X> list = new ArrayList<>();
+    final List<T> list = new ArrayList<>();
     try {
       while (resultSet.next()) {
         Optional.ofNullable(getObject(resultSet, clazz)).ifPresent(list::add);
@@ -349,9 +325,9 @@ public class AbstractJdbcPlusRepository {
    * @param entity     the entity
    * @param columnsMap a map of column names and fields
    */
-  public <X> void populateByColumnsMap(
+  public <T> void populateByColumnsMap(
       final ResultSet resultSet,
-      final X entity,
+      final T entity,
       final Map<String, Field> columnsMap
   ) {
     try {
@@ -392,28 +368,30 @@ public class AbstractJdbcPlusRepository {
    * @param resultSet the result set
    * @param entity    the entity
    */
-  public <X> void populateColumnFields(
+  public <T> void populateColumnFields(
       final ResultSet resultSet,
-      final X entity,
-      final Class<X> clazz
+      final T entity
   ) {
-    populateByColumnsMap(resultSet, entity, getColumnsMap(clazz));
+    populateByColumnsMap(resultSet, entity, getColumnsMap(entity.getClass()));
   }
 
   /**
    * Populate one {@link OneToMany} field.
    *
-   * @param entity the entity
    * @param field  field that contains @OneToMany annotation
+   * @param entity the entity
    */
-  public <X> void populateOneToManyField(
+  public <T> void populateOneToManyField(
       final Field field,
-      final X entity,
-      final Class<X> clazz
+      final T entity
   ) {
     final Class<?> targetEntity = getTargetEntity(field);
     final String targetEntityTableName = getTableName(targetEntity);
-    final Field manyToOneField = getRelationalField(targetEntity, clazz, ManyToOne.class);
+    final Field manyToOneField = getRelationalField(
+        targetEntity,
+        entity.getClass(),
+        ManyToOne.class
+    );
     final String targetEntityManyToOneColumnName = getColumnName(manyToOneField);
     final Object currentEntityIdColumnValue = getIdColumnValue(entity);
     final String query = sqlSelectAllByColumn(
@@ -429,9 +407,9 @@ public class AbstractJdbcPlusRepository {
     );
   }
 
-  public <X, R> void populateField(
+  public <T, R> void populateField(
       final Field field,
-      final X entity,
+      final T entity,
       final String query,
       final Function<ResultSet, R> resultSetFunction,
       final Supplier<R> defaultResult
@@ -454,31 +432,30 @@ public class AbstractJdbcPlusRepository {
    *
    * @param entity the entity
    */
-  public <X> void populateOneToManyFields(final X entity) {
-    final Class<X> clazz = getGenerifiedClass(entity);
-    for (Field field : getOneToManyFields(clazz)) {
-      populateOneToManyField(field, entity, clazz);
+  public <T> void populateOneToManyFields(final T entity) {
+    for (Field field : getOneToManyFields(entity.getClass())) {
+      populateOneToManyField(field, entity);
     }
   }
 
   /**
    * Populate one {@link ManyToMany} field.
    *
-   * @param <X>    entity type
+   * @param <T>    entity type
    * @param field  field that contains @OneToMany|@ManyToMany annotation
    *               and returns a table name
    * @param entity the entity
    */
-  public <X> void populateManyToManyField(
+  public <T> void populateManyToManyField(
       final Field field,
-      final X entity
+      final T entity
   ) {
     if (Collection.class.isAssignableFrom(field.getType())) {
       final Class<?> targetEntity = getTargetEntity(field);
       final JoinTable joinTable = getJoinTable(field);
       final JoinColumn joinColumn = joinTable.joinColumn();
       final JoinColumn inverseJoinColumn = joinTable.inverseJoinColumn();
-      final Class<X> entityClass = getGenerifiedClass(entity);
+      final Class<T> entityClass = getGenerifiedClass(entity);
       final String currentEntityIdColumnName = getEntityJoinColumnName(entityClass, joinColumn);
       final String targetEntityIdColumnName = getEntityJoinColumnName(
           targetEntity,
@@ -511,20 +488,20 @@ public class AbstractJdbcPlusRepository {
    * @param resultSet    the result set
    * @param idColumnName target entity id column name
    * @param clazz        class object of the target entity
-   * @param <X>          specific type of the target entity
+   * @param <T>          specific type of the target entity
    * @return a list of related entities
    */
-  public <X> List<X> fetchEntitiesByIdColumn(
+  public <T> List<T> fetchEntitiesByIdColumn(
       final ResultSet resultSet,
       final String idColumnName,
-      final Class<X> clazz
+      final Class<T> clazz
   ) {
-    final List<X> list = new ArrayList<>();
+    final List<T> list = new ArrayList<>();
     try {
       while (resultSet.next()) {
         final int idColumnNumber = getColumnNumber(resultSet, idColumnName);
         final Object idColumnValue = resultSet.getObject(idColumnNumber);
-        final X foundEntity = findById(idColumnValue, clazz)
+        final T foundEntity = findById(idColumnValue, clazz)
             .orElseThrow(() -> new InvalidResultSetException(String.format(
                 "Cannot find entity %s by id: %s", clazz.getName(), idColumnValue
             )));
@@ -537,14 +514,14 @@ public class AbstractJdbcPlusRepository {
     return list;
   }
 
-  private int getColumnNumber(final ResultSet resultSet, final String columnName) {
+  private int getColumnNumber(
+      final ResultSet resultSet,
+      final String columnName
+  ) {
     try {
       return resultSet.findColumn(columnName);
     } catch (SQLException e) {
-      throw new InvalidResultSetException(String.format(
-          "Result set column does not exist: %s",
-          columnName
-      ));
+      throw new JdbcPlusException(e);
     }
   }
 
@@ -553,9 +530,8 @@ public class AbstractJdbcPlusRepository {
    *
    * @param entity the entity
    */
-  public <X> void populateManyToManyFields(final X entity) {
-    final Class<X> clazz = getGenerifiedClass(entity);
-    for (Field field : getManyToManyFields(clazz)) {
+  public <T> void populateManyToManyFields(final T entity) {
+    for (Field field : getManyToManyFields(entity.getClass())) {
       populateManyToManyField(field, entity);
     }
   }
