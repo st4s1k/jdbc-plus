@@ -173,8 +173,8 @@ public class AbstractJdbcPlusRepository {
   public <T> Optional<T> save(final T entity) {
     findById(entity)
         .ifPresentOrElse(
-            e -> databaseConnection.queryTransaction(sqlUpdate(e)),
-            () -> databaseConnection.queryTransaction(sqlInsert(entity))
+            e -> databaseConnection.updateTransaction(sqlUpdate(e)),
+            () -> databaseConnection.updateTransaction(sqlInsert(entity))
         );
     return findById(entity);
   }
@@ -187,7 +187,7 @@ public class AbstractJdbcPlusRepository {
    */
   public <T> Optional<T> remove(final T entity) {
     final Optional<T> foundEntity = findById(entity);
-    foundEntity.ifPresent(e -> databaseConnection.queryTransaction(sqlRemove(e)));
+    foundEntity.ifPresent(e -> databaseConnection.updateTransaction(sqlRemove(e)));
     return foundEntity;
   }
 

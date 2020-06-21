@@ -263,7 +263,7 @@ class AbstractJdbcPlusRepositoryTest {
     // Then
     final var inOrder = inOrder(databaseConnection);
     inOrder.verify(databaseConnection).queryTransaction(eq(expectedSelectQuery), any(), any());
-    inOrder.verify(databaseConnection).queryTransaction(eq(expectedInsertQuery));
+    inOrder.verify(databaseConnection).updateTransaction(eq(expectedInsertQuery));
     inOrder.verify(databaseConnection).queryTransaction(eq(expectedSelectQuery), any(), any());
   }
 
@@ -287,7 +287,7 @@ class AbstractJdbcPlusRepositoryTest {
     // Then
     final var inOrder = inOrder(databaseConnection);
     inOrder.verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());
-    inOrder.verify(databaseConnection).queryTransaction(eq(expectedQuery));
+    inOrder.verify(databaseConnection).updateTransaction(eq(expectedQuery));
     inOrder.verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());
   }
 
@@ -310,7 +310,7 @@ class AbstractJdbcPlusRepositoryTest {
 
     // Then
     verify(databaseConnection).queryTransaction(eq(selectQuery), any(), any());
-    verify(databaseConnection).queryTransaction(eq(expectedQuery));
+    verify(databaseConnection).updateTransaction(eq(expectedQuery));
   }
 
   @Test

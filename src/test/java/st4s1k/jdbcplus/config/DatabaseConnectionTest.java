@@ -2,6 +2,7 @@ package st4s1k.jdbcplus.config;
 
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -39,6 +40,11 @@ class DatabaseConnectionTest {
 
   @Mock
   private ResultSet resultSet;
+
+  @BeforeEach
+  void setUp() {
+    DatabaseConnectionTestUtils.resetDatabaseConnection();
+  }
 
   @AfterEach
   void tearDown() {
@@ -129,9 +135,6 @@ class DatabaseConnectionTest {
 
   @Test
   void testQueryTransactionWhenOperationThrowsThenRollbackAndLogException() throws SQLException {
-    doNothing().when(connection).setAutoCommit(false);
-    doNothing().when(connection).commit();
-
     when(dataSource.getConnection()).thenReturn(connection);
     when(connection.createStatement()).thenReturn(statement);
     when(statement.executeQuery(eq(QUERY))).thenReturn(resultSet);
@@ -147,7 +150,10 @@ class DatabaseConnectionTest {
       throw new RuntimeException();
     };
 
-    databaseConnection.queryTransaction(QUERY, operation, Object::new);
+    assertThrows(
+        RuntimeException.class,
+        () -> databaseConnection.queryTransaction(QUERY, operation, Object::new)
+    );
 
     verify(logger).log(eq(ERROR), nullable(String.class), isA(RuntimeException.class));
     verify(connection).rollback();
