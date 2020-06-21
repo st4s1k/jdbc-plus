@@ -1,7 +1,11 @@
 package st4s1k.jdbcplus.exceptions;
 
 public class InvalidMappingException extends JdbcPlusException {
-  public InvalidMappingException(String message) {
+  protected InvalidMappingException(String message) {
     super(message);
+  }
+
+  public static InvalidMappingException of(String message) {
+    return new InvalidMappingException(message);
   }
 }

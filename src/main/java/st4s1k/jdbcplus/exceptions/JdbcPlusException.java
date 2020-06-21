@@ -2,22 +2,31 @@ package st4s1k.jdbcplus.exceptions;
 
 public class JdbcPlusException extends RuntimeException {
 
-  public JdbcPlusException() {
+  protected JdbcPlusException() {
     super();
   }
 
-  public JdbcPlusException(final Exception exception) {
-    super(exception);
+  protected JdbcPlusException(final Throwable cause) {
+    super(cause);
   }
 
-  public JdbcPlusException(final String message) {
+  protected JdbcPlusException(final String message) {
     super(message);
   }
 
-  public JdbcPlusException(
-      final String message,
-      final Exception exception
-  ) {
-    super(message, exception);
+  protected JdbcPlusException(final String message, final Throwable cause) {
+    super(message, cause);
+  }
+
+  public static JdbcPlusException of(final Exception e) {
+    return new JdbcPlusException(e);
+  }
+
+  public static JdbcPlusException of(final String msg) {
+    return new JdbcPlusException(msg);
+  }
+
+  public static JdbcPlusException of(final String msg, final Throwable cause) {
+    return new JdbcPlusException(msg, cause);
   }
 }

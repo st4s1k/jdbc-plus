@@ -38,7 +38,7 @@ public class EntityUtils {
     } catch (NoSuchFieldException e) {
       final String message = String.format("No such field field %s#%s", clazz.getName(), fieldName);
       LOGGER.log(ERROR, message, e);
-      throw new JdbcPlusException(e);
+      throw JdbcPlusException.of(e);
     }
   }
 
@@ -62,7 +62,7 @@ public class EntityUtils {
 
   public static String getTableName(final Class<?> clazz) {
     if (!clazz.isAnnotationPresent(Table.class)) {
-      throw new MissingAnnotationException(clazz, Table.class);
+      throw MissingAnnotationException.of(clazz, Table.class);
     }
     return Objects.requireNonNullElse(
         clazz.getAnnotation(Table.class).value(),
@@ -73,7 +73,7 @@ public class EntityUtils {
   public static Field getIdColumn(final Class<?> clazz) {
     final List<Field> idFields = Arrays.asList(getFieldsAnnotatedWith(Id.class, clazz));
     if (idFields.isEmpty()) {
-      throw new MissingAnnotationException(clazz, Id.class);
+      throw MissingAnnotationException.of(clazz, Id.class);
     }
     return idFields.get(0);
   }
@@ -88,7 +88,7 @@ public class EntityUtils {
           ? getAnnotation(field, Column.class).value()
           : toSnakeLowerCase(field.getName());
     } else {
-      throw new MissingAnnotationException(field, Id.class);
+      throw MissingAnnotationException.of(field, Id.class);
     }
   }
 
@@ -114,7 +114,7 @@ public class EntityUtils {
     } else if (field.isAnnotationPresent(Id.class)) {
       return getIdColumnName(field);
     }
-    throw new MissingAnnotationException(
+    throw MissingAnnotationException.of(
         field,
         Column.class,
         JoinColumn.class,
@@ -132,7 +132,7 @@ public class EntityUtils {
     if (field.isAnnotationPresent(JoinColumn.class)) {
       return getAnnotation(field, JoinColumn.class).value();
     }
-    throw new MissingAnnotationException(field, JoinColumn.class);
+    throw MissingAnnotationException.of(field, JoinColumn.class);
   }
 
   public static Map<String, Field> getColumnsMap(final Class<?> clazz) {
@@ -167,7 +167,7 @@ public class EntityUtils {
     if (parentFields.size() == 1) {
       return parentFields.get(0);
     }
-    throw new InvalidMappingException(String.format(
+    throw InvalidMappingException.of(String.format(
         "There should be exactly one @%s field of type %s in class %s, found %d",
         annotation.getSimpleName(),
         targetEntity.getName(),
@@ -190,7 +190,7 @@ public class EntityUtils {
         .map(f -> f.getAnnotation(annotationClass))
         .map(targetEntitySupplier)
         .map(clazz -> void.class.equals(clazz) ? getObjectOrCollectionType(field) : clazz)
-        .orElseThrow(() -> new InvalidMappingException(String.format(
+        .orElseThrow(() -> InvalidMappingException.of(String.format(
             "Missing @%s annotation",
             annotationClass.getSimpleName()
         )));
@@ -206,7 +206,7 @@ public class EntityUtils {
     } else if (field.isAnnotationPresent(ManyToMany.class)) {
       return getTargetEntity(field, ManyToMany.class, ManyToMany::targetEntity);
     }
-    throw new InvalidMappingException(String.format(
+    throw InvalidMappingException.of(String.format(
         "Field %s does not contain any relation defining annotation",
         field.getName()
     ));
@@ -225,7 +225,7 @@ public class EntityUtils {
       final Class<A> annotationClass
   ) {
     return Optional.ofNullable(field.getAnnotation(annotationClass))
-        .orElseThrow(() -> new InvalidMappingException(String.format(
+        .orElseThrow(() -> InvalidMappingException.of(String.format(
             "Missing @%s annotation on field %s",
             annotationClass.getSimpleName(),
             field.getName()
@@ -265,7 +265,7 @@ public class EntityUtils {
     for (Field field : fields) {
       if (!field.isAnnotationPresent(JoinTable.class)
           && field.getAnnotation(ManyToMany.class).mappedBy().isEmpty()) {
-        throw new InvalidMappingException(String.format(
+        throw InvalidMappingException.of(String.format(
             "Missing @JoinTable annotation or mappedBy, in class%s at field %s",
             clazz.getName(),
             field.getName()
@@ -302,10 +302,10 @@ public class EntityUtils {
         return field.get(entity);
       } catch (IllegalAccessException e) {
         LOGGER.log(ERROR, e.getLocalizedMessage(), e);
-        throw new JdbcPlusException(e);
+        throw JdbcPlusException.of(e);
       }
     } else {
-      throw new MissingAnnotationException(
+      throw MissingAnnotationException.of(
           field,
           Column.class,
           JoinColumn.class,
@@ -337,7 +337,7 @@ public class EntityUtils {
       return idColumn.get(entity);
     } catch (IllegalAccessException e) {
       LOGGER.log(ERROR, e.getLocalizedMessage(), e);
-      throw new JdbcPlusException(e);
+      throw JdbcPlusException.of(e);
     }
   }
 

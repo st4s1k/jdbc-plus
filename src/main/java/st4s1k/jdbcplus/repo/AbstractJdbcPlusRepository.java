@@ -476,7 +476,7 @@ public class AbstractJdbcPlusRepository {
           Collections::emptyList
       );
     } else {
-      throw new InvalidMappingException(
+      throw InvalidMappingException.of(
           "@ManyToMany annotated field is not of a collection type!"
       );
     }
@@ -521,7 +521,7 @@ public class AbstractJdbcPlusRepository {
     try {
       return resultSet.findColumn(columnName);
     } catch (SQLException e) {
-      throw new JdbcPlusException(e);
+      throw JdbcPlusException.of(e);
     }
   }
 
